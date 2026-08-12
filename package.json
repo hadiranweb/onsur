@@ -1,0 +1,26 @@
+{
+  "name": "element-plus",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Element Plus (عنصر پلاس) — structured problem-solving platform monorepo.",
+  "packageManager": "pnpm@9.15.0",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "lint": "eslint .",
+    "typecheck": "pnpm -r run typecheck",
+    "test": "pnpm -r run test",
+    "build": "pnpm -r run build",
+    "check:arch": "node scripts/check-architecture.mjs"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.39.0",
+    "eslint": "^9.39.0",
+    "globals": "^17.0.0",
+    "prettier": "^3.3.3",
+    "typescript-eslint": "^8.67.0"
+  }
+}
