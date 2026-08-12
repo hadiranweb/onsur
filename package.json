@@ -14,7 +14,9 @@
     "typecheck": "pnpm -r run typecheck",
     "test": "pnpm -r run test",
     "build": "pnpm -r run build",
-    "check:arch": "node scripts/check-architecture.mjs"
+    "check:arch": "node scripts/check-architecture.mjs",
+    "db:start": "pnpm --filter @element-plus/application db:start",
+    "db:migrate": "pnpm --filter @element-plus/application db:migrate"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.0",

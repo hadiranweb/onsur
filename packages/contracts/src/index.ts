@@ -119,5 +119,34 @@ export type { Asset, AssetKind, AssetVisibility } from './asset'
 export { auditEventSchema, auditOutcomeSchema } from './audit'
 export type { AuditEvent, AuditOutcome } from './audit'
 
+export {
+  emailSchema,
+  passwordSchema,
+  displayNameSchema,
+  registerInputSchema,
+  loginInputSchema,
+  workspaceRoleSchema,
+  workspaceKindSchema,
+  userSchema,
+  publicUserSchema,
+  sessionSchema,
+  workspaceSchema,
+  membershipSchema,
+  createWorkspaceInputSchema,
+} from './identity'
+export type {
+  Email,
+  RegisterInput,
+  LoginInput,
+  WorkspaceRole,
+  WorkspaceKind,
+  User,
+  PublicUser,
+  Session,
+  Workspace,
+  Membership,
+  CreateWorkspaceInput,
+} from './identity'
+
 export { envSchema, parseEnv, getEnv } from './env'
 export type { Env, EnvResult } from './env'

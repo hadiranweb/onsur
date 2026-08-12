@@ -1,3 +1,5 @@
+import Link from 'next/link'
+
 export default function Home() {
   return (
     <main className="home">
@@ -6,8 +8,12 @@ export default function Home() {
         عنصر پلاس
       </p>
       <p>A structured problem-solving platform.</p>
+      <p className="home__actions">
+        <Link href="/login">Log in</Link>
+        <Link href="/register">Register</Link>
+      </p>
       <p>
-        Foundation sprint scaffold. Health surface: <a href="/api/health">/api/health</a>
+        Health surface: <a href="/api/health">/api/health</a>
       </p>
     </main>
   )

@@ -13,6 +13,14 @@ body {
   line-height: 1.5;
 }
 
+main {
+  padding: 1.5rem;
+}
+
+a {
+  color: inherit;
+}
+
 .home {
   max-width: 40rem;
   margin: 4rem auto;
@@ -30,6 +38,64 @@ body {
   margin: 0 0 1rem;
 }
 
-a {
-  color: inherit;
+.home__actions {
+  display: flex;
+  gap: 1rem;
+}
+
+.auth {
+  max-width: 24rem;
+  margin: 4rem auto;
+}
+
+.auth__error {
+  color: #c0392b;
+}
+
+.auth__form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.auth__form label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.auth__form input {
+  padding: 0.5rem;
+}
+
+.auth__form button {
+  padding: 0.5rem;
+  cursor: pointer;
+}
+
+.shell__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.75rem 1.5rem;
+  border-bottom: 1px solid #8884;
+}
+
+.shell__nav {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.shell__user {
+  opacity: 0.8;
+}
+
+.shell__body {
+  max-width: 56rem;
+  margin: 0 auto;
+}
+
+.app-home ul {
+  padding-left: 1.25rem;
 }

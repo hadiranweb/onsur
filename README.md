@@ -11,10 +11,12 @@ versioned knowledge.
 
 ## Status
 
-- Sprint 00 (clean repository foundation): **in progress**
-- Sprint 01+ (canonical contracts, identity, problem solving, run engine,
-  knowledge governance, packages, marketplace, hardening): planned — see the
-  sprint roadmap below.
+- Sprint 00 (clean repository foundation): **done**
+- Sprint 01 (canonical contracts + domain core): **done**
+- Sprint 02 (PostgreSQL + identity + workspace): **in progress**
+- Sprint 03+ (Founder, capability/process/island, run engine, OpenClaw,
+  evidence/memory/knowledge, packages, marketplace, hardening): planned — see
+  the sprint roadmap below.
 
 ## Architecture
 
@@ -23,7 +25,7 @@ PostgreSQL drivers, OpenClaw, or LLM/provider SDKs.
 
 ```
 apps/web               Next.js web application (the only framework host)
-packages/application   application services / orchestration
+packages/application   application services / orchestration + persistence adapters
 packages/contracts     canonical Zod schemas (the spec's domain language)
 packages/domain        pure domain rules — no framework/runtime dependencies
 ```
@@ -46,13 +48,24 @@ Key non-negotiables (from the specification):
 The dependency direction is enforced by `pnpm check:arch` and a domain
 architecture test (see `docs/adr/0001-monorepo-and-layer-boundaries.md`).
 
+### Identity + workspace (Sprint 02)
+
+- Server-side sessions: a random per-session token is issued, only its SHA-256
+  hash is persisted, and the cookie carries an HMAC-signed envelope
+  (`AUTH_SECRET`). There is no shared token used as identity.
+- Default-deny workspace authorization: a user with no membership (or a role
+  below the required role) is denied; the decision core is pure (`domain`).
+- Each user gets exactly one `personal` workspace, enforced by a partial unique
+  index and idempotent creation.
+- Passwords are scrypt-hashed (per-user salt, constant-time verify).
+
 ## Repository layout
 
 ```
-apps/web/                  Next.js app (web shell, local health surface)
-packages/domain/           pure domain boundaries (placeholder in Sprint 00)
+apps/web/                  Next.js app: auth pages, authenticated shell, API
+packages/domain/           pure domain rules + boundary placeholders
 packages/contracts/        canonical schemas + environment contract
-packages/application/      application services (placeholder in Sprint 00)
+packages/application/      services, ports, PostgreSQL adapters, migrations
 scripts/check-architecture.mjs
 docs/adr/                  architecture decision records
 ```
@@ -70,8 +83,15 @@ docs/adr/                  architecture decision records
 
 ```bash
 pnpm install
-pnpm dev          # start the web app (after `pnpm build` for libs, if needed)
+pnpm db:start      # boot a local PostgreSQL (PGlite over the wire protocol)
+pnpm db:migrate    # apply versioned migrations (DATABASE_URL must be set)
+pnpm dev           # start the web app
 ```
+
+The local database is real PostgreSQL (PGlite, compiled to WASM) served over
+the standard wire protocol on `127.0.0.1:5432`, so the app uses the ordinary
+`pg` driver and `DATABASE_URL`. The same code runs against any hosted
+PostgreSQL by pointing `DATABASE_URL` at it.
 
 Open http://localhost:3000 and the health surface at
 http://localhost:3000/api/health.
@@ -88,20 +108,24 @@ pnpm build
 pnpm check:arch
 ```
 
+Integration tests (`packages/application/src/__tests__/postgres.integration.test.ts`)
+boot their own in-process PostgreSQL and run automatically as part of
+`pnpm test`; no external database is required.
+
 ## Environment
 
-Copy `.env.example` to `.env.local` and fill in values. In Sprint 00/01 no
-database or auth secret is required; `DATABASE_URL` and `AUTH_SECRET` become
-required from Sprint 02 onward. The web health surface reports environment
-validation status honestly (`ok` vs `degraded`).
+Copy `.env.example` to `.env.local` and fill in values. `DATABASE_URL` and
+`AUTH_SECRET` are required from Sprint 02 onward. The health surface reports
+environment validation and database connectivity honestly
+(`connected | error | not_configured`).
 
 ## Sprint roadmap
 
 | Sprint | Scope                                      | Status  |
 | ------ | ------------------------------------------ | ------- |
-| 00     | Clean foundation                           | current |
-| 01     | Canonical contracts + domain core          | planned |
-| 02     | PostgreSQL + identity + workspace          | planned |
+| 00     | Clean foundation                           | done    |
+| 01     | Canonical contracts + domain core          | done    |
+| 02     | PostgreSQL + identity + workspace          | current |
 | 03     | Founder + structured problem solving       | planned |
 | 04     | Capability + process + island              | planned |
 | 05     | Run engine + fake runtime                  | planned |

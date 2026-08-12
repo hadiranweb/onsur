@@ -71,3 +71,9 @@ export {
   isForwardProposal,
   canMergeProposal,
 } from './rules/knowledge'
+
+export { roleAtLeast, canAccessWorkspace, isWorkspaceOwner } from './rules/workspace'
+export type { MembershipLike } from './rules/workspace'
+
+export { isSessionActive, validatePassword } from './rules/identity'
+export type { SessionLike } from './rules/identity'

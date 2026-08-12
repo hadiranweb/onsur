@@ -3,13 +3,18 @@ import { z } from 'zod'
 /**
  * The environment contract for Element Plus runtimes.
  *
- * In Sprint 00 only `NODE_ENV` is validated; `DATABASE_URL` and `AUTH_SECRET`
- * are declared (optional) and become required from Sprint 02 onward.
+ * `DATABASE_URL` and `AUTH_SECRET` are required from Sprint 02 onward
+ * (identity + workspace persistence). `AUTH_SECRET` signs the session cookie
+ * envelope; `DATABASE_URL` locates PostgreSQL.
  */
 export const envSchema = z.object({
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
-  DATABASE_URL: z.string().min(1).optional(),
-  AUTH_SECRET: z.string().min(1).optional(),
+  DATABASE_URL: z
+    .string({ required_error: 'DATABASE_URL is required' })
+    .min(1, 'DATABASE_URL is required'),
+  AUTH_SECRET: z
+    .string({ required_error: 'AUTH_SECRET is required' })
+    .min(16, 'AUTH_SECRET must be at least 16 characters'),
 })
 
 export type Env = z.infer<typeof envSchema>

@@ -13,6 +13,9 @@ build/
 # test output
 coverage/
 
+# local database data (PGlite file-backed dev database)
+.data/
+
 # environment (never commit real secrets)
 .env
 .env.local

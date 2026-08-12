@@ -14,14 +14,20 @@
   "scripts": {
     "typecheck": "tsc --noEmit",
     "build": "tsc --noEmit",
-    "test": "vitest run --passWithNoTests"
+    "test": "vitest run",
+    "db:start": "node scripts/start-db.mjs",
+    "db:migrate": "node scripts/migrate.mjs"
   },
   "dependencies": {
     "@element-plus/contracts": "workspace:*",
-    "@element-plus/domain": "workspace:*"
+    "@element-plus/domain": "workspace:*",
+    "pg": "^8.13.0"
   },
   "devDependencies": {
+    "@electric-sql/pglite": "^0.5.4",
+    "@electric-sql/pglite-socket": "^0.2.7",
     "@types/node": "^22.20.0",
+    "@types/pg": "^8.11.10",
     "typescript": "^5.9.3",
     "vitest": "^3.2.0"
   }
