@@ -12,6 +12,7 @@ import { IslandService } from './services/island-service'
 import { ProcessService } from './services/process-service'
 import { RunEngine } from './services/run-engine'
 import { WorkspaceService } from './services/workspace-service'
+import type { OpenClawCliConfig } from './openclaw/cli'
 import type { StructuredLlmPort } from './ports'
 
 export interface AppServices {
@@ -22,6 +23,7 @@ export interface AppServices {
   processes: ProcessService
   islands: IslandService
   runs: RunEngine
+  openClaw?: OpenClawCliConfig
   pool: Pool
   close(): Promise<void>
 }
@@ -31,6 +33,7 @@ export interface AppServicesConfig {
   authSecret: string
   pool?: Pool
   structuredLlm?: StructuredLlmPort
+  openClaw?: OpenClawCliConfig
 }
 
 /**
@@ -82,6 +85,7 @@ export function createAppServices(config: AppServicesConfig): AppServices {
     registry: new InMemoryToolRegistry(),
     islands,
     processes,
+    openClawConfig: config.openClaw,
   })
 
   return {
@@ -92,6 +96,7 @@ export function createAppServices(config: AppServicesConfig): AppServices {
     processes,
     islands,
     runs,
+    openClaw: config.openClaw,
     pool,
     async close() {
       await pool.end()

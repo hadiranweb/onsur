@@ -85,6 +85,18 @@ export type {
 
 export { InMemoryToolRegistry, DEFAULT_TOOL_CONTRACTS } from './infrastructure/tool-registry'
 
+export { OpenClawRuntimeAdapter, renderContext, classifyMemoryCandidates } from './openclaw/adapter'
+export type { OpenClawAdapterOptions } from './openclaw/adapter'
+export { runOpenClawAgent } from './openclaw/cli'
+export type { OpenClawCliConfig, OpenClawRunResult, OpenClawAgentJson } from './openclaw/cli'
+export {
+  deriveOpenClawSessionKey,
+  isElementPlusSessionKey,
+  assertDistinctSessionKey,
+} from './openclaw/session-mapping'
+export { checkOpenClawHealth } from './openclaw/health'
+export type { OpenClawHealthStatus, OpenClawHealthResult } from './openclaw/health'
+
 export {
   STRUCTURED_ANALYSIS_CAPABILITY,
   structuredAnalysisIslandManifest,

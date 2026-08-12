@@ -14,6 +14,8 @@ import type {
 } from '@element-plus/contracts'
 import { AppError } from '../errors'
 import { FakeRuntimeAdapter } from '../infrastructure/fake-runtime-adapter'
+import { OpenClawRuntimeAdapter } from '../openclaw/adapter'
+import type { OpenClawCliConfig } from '../openclaw/cli'
 import type {
   ApprovalRecord,
   ApprovalRepository,
@@ -34,6 +36,7 @@ import type {
   ToolRegistry,
 } from '../ports'
 import { makeProvenance } from '../util/provenance'
+import { normalizeError } from '../util/normalize-error'
 import type { IslandService } from './island-service'
 import type { ProcessService } from './process-service'
 
@@ -67,6 +70,7 @@ export interface RunEngineDeps {
   processes: ProcessService
   now?: () => Date
   runtimeFactory?: (island: Island, gate: ToolGate) => RuntimeAdapter
+  openClawConfig?: OpenClawCliConfig
 }
 
 type Decision = 'approved' | 'rejected' | 'cancelled'
@@ -80,6 +84,7 @@ export class RunEngine {
   private readonly now: () => Date
   private readonly waiters = new Map<string, (entry: DecisionEntry) => void>()
   private readonly decisions = new Map<string, DecisionEntry>()
+  private readonly controllers = new Map<string, AbortController>()
 
   constructor(private readonly deps: RunEngineDeps) {
     this.now = deps.now ?? (() => new Date())
@@ -200,6 +205,8 @@ export class RunEngine {
       return this.mustRun(runId)
     }
 
+    // Abort the active runtime adapter (e.g. kill the OpenClaw subprocess).
+    this.controllers.get(runId)?.abort()
     await this.appendEvent(runId, 'cancel', {})
     await this.transition(runId, 'cancel')
     return this.mustRun(runId)
@@ -261,12 +268,21 @@ export class RunEngine {
       request: (request) => this.gateRequest(runId, request),
     }
 
+    const controller = new AbortController()
+    this.controllers.set(runId, controller)
+
     const adapter = this.deps.runtimeFactory
       ? this.deps.runtimeFactory(island, gate)
-      : defaultRuntimeFactory(island, gate)
+      : defaultRuntimeFactory(island, gate, this.deps.openClawConfig)
 
     try {
-      for await (const event of adapter.start({ runId, island, process, problemSpec })) {
+      for await (const event of adapter.start({
+        runId,
+        island,
+        process,
+        problemSpec,
+        signal: controller.signal,
+      })) {
         switch (event.type) {
           case 'started':
             break
@@ -304,6 +320,8 @@ export class RunEngine {
       })
     } catch (error) {
       await this.failRun(runId, normalizeError(error))
+    } finally {
+      this.controllers.delete(runId)
     }
   }
 
@@ -491,9 +509,21 @@ export class RunEngine {
   }
 }
 
-function defaultRuntimeFactory(island: Island, gate: ToolGate): RuntimeAdapter {
+function defaultRuntimeFactory(
+  island: Island,
+  gate: ToolGate,
+  openClawConfig?: OpenClawCliConfig,
+): RuntimeAdapter {
   if (island.runtime.runtime === 'fake') {
     return new FakeRuntimeAdapter({ gate })
+  }
+  if (island.runtime.runtime === 'openclaw') {
+    const config = openClawConfig ?? {
+      bin: process.env.OPENCLAW_BIN ?? 'openclaw',
+      agentId: process.env.OPENCLAW_AGENT_ID ?? 'main',
+      timeoutSeconds: 600,
+    }
+    return new OpenClawRuntimeAdapter({ cli: config })
   }
   throw new AppError(
     'INVALID_INPUT',
@@ -501,22 +531,6 @@ function defaultRuntimeFactory(island: Island, gate: ToolGate): RuntimeAdapter {
   )
 }
 
-export function normalizeError(error: unknown): RuntimeError {
-  if (
-    typeof error === 'object' &&
-    error !== null &&
-    'code' in error &&
-    typeof (error as { code?: unknown }).code === 'string' &&
-    'message' in error &&
-    typeof (error as { message?: unknown }).message === 'string'
-  ) {
-    return {
-      code: (error as { code: string }).code,
-      message: (error as { message: string }).message,
-    }
-  }
-  if (error instanceof Error) {
-    return { code: 'ENGINE_ERROR', message: error.message }
-  }
-  return { code: 'UNKNOWN', message: String(error) }
-}
+// Re-export for backwards compatibility; the canonical implementation lives in
+// `util/normalize-error` (shared with the OpenClaw adapter).
+export { normalizeError }

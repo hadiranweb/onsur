@@ -16,9 +16,10 @@ versioned knowledge.
 - Sprint 02 (PostgreSQL + identity + workspace): **done**
 - Sprint 03 (Founder + structured problem solving): **done**
 - Sprint 04 (capability + process + island): **done**
-- Sprint 05 (run engine + fake runtime): **in progress**
-- Sprint 06+ (OpenClaw, evidence/memory/knowledge, packages, marketplace,
-  hardening): planned — see the sprint roadmap below.
+- Sprint 05 (run engine + fake runtime): **done**
+- Sprint 06 (OpenClaw adapter): **in progress**
+- Sprint 07+ (evidence/memory/knowledge, packages, marketplace, hardening):
+  planned — see the sprint roadmap below.
 
 ## Architecture
 
@@ -130,8 +131,8 @@ environment validation and database connectivity honestly
 | 02     | PostgreSQL + identity + workspace          | done    |
 | 03     | Founder + structured problem solving       | done    |
 | 04     | Capability + process + island              | done    |
-| 05     | Run engine + fake runtime                  | current |
-| 06     | OpenClaw adapter                           | planned |
+| 05     | Run engine + fake runtime                  | done    |
+| 06     | OpenClaw adapter                           | current |
 | 07     | Evidence + feedback + memory               | planned |
 | 08     | Knowledge governance + evolution           | planned |
 | 09     | Package protocol + outbox + connectors     | planned |

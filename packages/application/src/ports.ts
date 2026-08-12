@@ -392,6 +392,8 @@ export interface RuntimeSession {
   island: Island
   process: Process | null
   problemSpec: ProblemSpecificationRecord
+  /** Aborted when the Run is cancelled; adapters should unwind promptly. */
+  signal?: AbortSignal
 }
 
 export interface ToolGateRequest {
