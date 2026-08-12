@@ -1,5 +1,15 @@
-import type { ProblemItem, Provenance, SpsStatus, WorkspaceRole } from '@element-plus/contracts'
 import type {
+  Capability,
+  Island,
+  ProblemItem,
+  Process,
+  Provenance,
+  SpsStatus,
+  WorkspaceRole,
+} from '@element-plus/contracts'
+import type {
+  CapabilityRepository,
+  IslandRepository,
   MembershipRecord,
   MembershipRepository,
   PasswordHasher,
@@ -7,6 +17,7 @@ import type {
   ProblemRepository,
   ProblemSpecificationRecord,
   ProblemSpecificationRepository,
+  ProcessRepository,
   SessionCodec,
   SessionRecord,
   SessionRepository,
@@ -377,9 +388,114 @@ export class InMemorySpsRepository implements SpsRepository {
   }
 }
 
-function maxByVersion(records: ProblemSpecificationRecord[]): ProblemSpecificationRecord | null {
+function maxByVersion<T extends { version: string }>(records: T[]): T | null {
   if (records.length === 0) return null
   return records.reduce((max, record) =>
     compareVersions(record.version, max.version) > 0 ? record : max,
   )
+}
+
+const maxVersion = maxByVersion
+
+export class InMemoryCapabilityRepository implements CapabilityRepository {
+  private readonly byKey = new Map<string, Capability>()
+
+  async create(input: Capability): Promise<Capability> {
+    this.byKey.set(`${input.id}::${input.version}`, input)
+    return input
+  }
+
+  async findById(id: string): Promise<Capability | null> {
+    return maxVersion([...this.byKey.values()].filter((cap) => cap.id === id))
+  }
+
+  async findLatestById(id: string): Promise<Capability | null> {
+    return this.findById(id)
+  }
+
+  async findLatestByName(name: string): Promise<Capability | null> {
+    return maxVersion([...this.byKey.values()].filter((cap) => cap.name === name))
+  }
+
+  async list(): Promise<Capability[]> {
+    return [...this.byKey.values()]
+  }
+}
+
+export class InMemoryProcessRepository implements ProcessRepository {
+  private readonly byKey = new Map<string, Process>()
+
+  async create(input: Process): Promise<Process> {
+    this.byKey.set(`${input.id}::${input.version}`, input)
+    return input
+  }
+
+  async findById(id: string): Promise<Process | null> {
+    return maxVersion([...this.byKey.values()].filter((process) => process.id === id))
+  }
+
+  async findLatestById(id: string): Promise<Process | null> {
+    return this.findById(id)
+  }
+
+  async listByIdentity(id: string): Promise<Process[]> {
+    return [...this.byKey.values()].filter((process) => process.id === id)
+  }
+
+  async list(): Promise<Process[]> {
+    return [...this.byKey.values()]
+  }
+
+  async updateStatus(id: string, status: Process['status']): Promise<void> {
+    for (const [key, process] of this.byKey) {
+      if (key.startsWith(`${id}::`)) {
+        process.status = status
+      }
+    }
+  }
+
+  all(): Process[] {
+    return [...this.byKey.values()]
+  }
+}
+
+export class InMemoryIslandRepository implements IslandRepository {
+  private readonly byKey = new Map<string, Island>()
+
+  async create(input: Island): Promise<Island> {
+    this.byKey.set(`${input.id}::${input.version}`, input)
+    return input
+  }
+
+  async findById(id: string): Promise<Island | null> {
+    return maxVersion([...this.byKey.values()].filter((island) => island.id === id))
+  }
+
+  async findLatestById(id: string): Promise<Island | null> {
+    return this.findById(id)
+  }
+
+  async listByIdentity(id: string): Promise<Island[]> {
+    return [...this.byKey.values()].filter((island) => island.id === id)
+  }
+
+  async list(): Promise<Island[]> {
+    return [...this.byKey.values()]
+  }
+
+  async listActive(): Promise<Island[]> {
+    return [...this.byKey.values()].filter((island) => island.status === 'active')
+  }
+
+  async updateStatus(id: string, status: Island['status']): Promise<void> {
+    for (const [key, island] of this.byKey) {
+      if (key.startsWith(`${id}::`)) {
+        island.status = status
+      }
+    }
+  }
+
+  all(): Island[] {
+    return [...this.byKey.values()]
+  }
 }

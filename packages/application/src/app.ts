@@ -5,7 +5,10 @@ import { FakeStructuredLlm } from './infrastructure/fake-structured-llm'
 import { ScryptPasswordHasher } from './infrastructure/scrypt-password-hasher'
 import { HmacSessionCodec } from './infrastructure/session-codec'
 import { AuthService } from './services/auth-service'
+import { CapabilityService } from './services/capability-service'
 import { FounderService } from './services/founder-service'
+import { IslandService } from './services/island-service'
+import { ProcessService } from './services/process-service'
 import { WorkspaceService } from './services/workspace-service'
 import type { StructuredLlmPort } from './ports'
 
@@ -13,6 +16,9 @@ export interface AppServices {
   auth: AuthService
   workspaces: WorkspaceService
   founder: FounderService
+  capabilities: CapabilityService
+  processes: ProcessService
+  islands: IslandService
   pool: Pool
   close(): Promise<void>
 }
@@ -56,10 +62,19 @@ export function createAppServices(config: AppServicesConfig): AppServices {
     workspaces,
   })
 
+  const capabilities = new CapabilityService({ capabilities: repositories.capabilities })
+
+  const processes = new ProcessService({ processes: repositories.processes })
+
+  const islands = new IslandService({ islands: repositories.islands, capabilities })
+
   return {
     auth,
     workspaces,
     founder,
+    capabilities,
+    processes,
+    islands,
     pool,
     async close() {
       await pool.end()

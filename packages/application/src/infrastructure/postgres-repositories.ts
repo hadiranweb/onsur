@@ -1,14 +1,28 @@
 import type { Pool } from 'pg'
-import type { ProblemItem, Provenance, SpsStatus, WorkspaceRole } from '@element-plus/contracts'
+import type {
+  Capability,
+  Island,
+  IslandStatus,
+  ProblemItem,
+  Process,
+  ProcessStatus,
+  Provenance,
+  Reference,
+  SpsStatus,
+  WorkspaceRole,
+} from '@element-plus/contracts'
 import { compareVersions } from '@element-plus/domain'
 import { UniqueViolationError } from '../errors'
 import type {
+  CapabilityRepository,
+  IslandRepository,
   MembershipRecord,
   MembershipRepository,
   ProblemRecord,
   ProblemRepository,
   ProblemSpecificationRecord,
   ProblemSpecificationRepository,
+  ProcessRepository,
   SessionRecord,
   SessionRepository,
   SpsMessageRecord,
@@ -498,6 +512,9 @@ export interface PostgresRepositories {
   problems: ProblemRepository
   specifications: ProblemSpecificationRepository
   sps: SpsRepository
+  capabilities: CapabilityRepository
+  processes: ProcessRepository
+  islands: IslandRepository
 }
 
 export function createPostgresRepositories(pool: Pool): PostgresRepositories {
@@ -509,11 +526,216 @@ export function createPostgresRepositories(pool: Pool): PostgresRepositories {
     problems: new PostgresProblemRepository(pool),
     specifications: new PostgresProblemSpecificationRepository(pool),
     sps: new PostgresSpsRepository(pool),
+    capabilities: new PostgresCapabilityRepository(pool),
+    processes: new PostgresProcessRepository(pool),
+    islands: new PostgresIslandRepository(pool),
+  }
+}
+
+function mapCapability(row: Record<string, unknown>): Capability {
+  return {
+    id: row.id as string,
+    version: row.version as string,
+    name: row.name as string,
+    description: row.description as string,
+    tags: (row.tags as string[]) ?? [],
+    provenance: row.provenance as Provenance,
+  }
+}
+
+function mapProcess(row: Record<string, unknown>): Process {
+  return {
+    id: row.id as string,
+    version: row.version as string,
+    status: row.status as Process['status'],
+    title: row.title as string,
+    description: row.description as string,
+    steps: row.steps as Process['steps'],
+    provenance: row.provenance as Provenance,
+  }
+}
+
+function mapIsland(row: Record<string, unknown>): Island {
+  return {
+    id: row.id as string,
+    version: row.version as string,
+    status: row.status as IslandStatus,
+    name: row.name as string,
+    description: row.description as string,
+    capabilities: row.capabilities as Reference[],
+    runtime: row.runtime as Island['runtime'],
+    permissions: (row.permissions as string[]) ?? [],
+    provenance: row.provenance as Provenance,
+  }
+}
+
+const CAPABILITY_COLUMNS = 'id, version, name, description, tags, provenance'
+const PROCESS_COLUMNS = 'id, version, status, title, description, steps, provenance'
+const ISLAND_COLUMNS =
+  'id, version, status, name, description, capabilities, runtime, permissions, provenance'
+
+export class PostgresCapabilityRepository implements CapabilityRepository {
+  constructor(private readonly pool: Pool) {}
+
+  async create(input: Capability): Promise<Capability> {
+    const result = await this.pool.query(
+      `INSERT INTO capabilities (id, version, name, description, tags, provenance)
+       VALUES ($1, $2, $3, $4, $5, $6)
+       RETURNING ${CAPABILITY_COLUMNS}`,
+      [
+        input.id,
+        input.version,
+        input.name,
+        input.description,
+        JSON.stringify(input.tags),
+        JSON.stringify(input.provenance),
+      ],
+    )
+    return mapCapability(result.rows[0])
+  }
+
+  async findById(id: string): Promise<Capability | null> {
+    const result = await this.pool.query(
+      `SELECT ${CAPABILITY_COLUMNS} FROM capabilities WHERE id = $1`,
+      [id],
+    )
+    return maxVersion(result.rows.map(mapCapability))
+  }
+
+  async findLatestById(id: string): Promise<Capability | null> {
+    return this.findById(id)
+  }
+
+  async findLatestByName(name: string): Promise<Capability | null> {
+    const result = await this.pool.query(
+      `SELECT ${CAPABILITY_COLUMNS} FROM capabilities WHERE name = $1`,
+      [name],
+    )
+    return maxVersion(result.rows.map(mapCapability))
+  }
+
+  async list(): Promise<Capability[]> {
+    const result = await this.pool.query(
+      `SELECT ${CAPABILITY_COLUMNS} FROM capabilities ORDER BY name ASC`,
+    )
+    return result.rows.map(mapCapability)
+  }
+}
+
+export class PostgresProcessRepository implements ProcessRepository {
+  constructor(private readonly pool: Pool) {}
+
+  async create(input: Process): Promise<Process> {
+    const result = await this.pool.query(
+      `INSERT INTO processes (id, version, status, title, description, steps, provenance)
+       VALUES ($1, $2, $3, $4, $5, $6, $7)
+       RETURNING ${PROCESS_COLUMNS}`,
+      [
+        input.id,
+        input.version,
+        input.status,
+        input.title,
+        input.description,
+        JSON.stringify(input.steps),
+        JSON.stringify(input.provenance),
+      ],
+    )
+    return mapProcess(result.rows[0])
+  }
+
+  async findById(id: string): Promise<Process | null> {
+    const result = await this.pool.query(`SELECT ${PROCESS_COLUMNS} FROM processes WHERE id = $1`, [
+      id,
+    ])
+    return maxVersion(result.rows.map(mapProcess))
+  }
+
+  async findLatestById(id: string): Promise<Process | null> {
+    return this.findById(id)
+  }
+
+  async listByIdentity(id: string): Promise<Process[]> {
+    const result = await this.pool.query(
+      `SELECT ${PROCESS_COLUMNS} FROM processes WHERE id = $1 ORDER BY version ASC`,
+      [id],
+    )
+    return result.rows.map(mapProcess)
+  }
+
+  async list(): Promise<Process[]> {
+    const result = await this.pool.query(
+      `SELECT ${PROCESS_COLUMNS} FROM processes ORDER BY title ASC`,
+    )
+    return result.rows.map(mapProcess)
+  }
+
+  async updateStatus(id: string, status: ProcessStatus): Promise<void> {
+    await this.pool.query(`UPDATE processes SET status = $2 WHERE id = $1`, [id, status])
+  }
+}
+
+export class PostgresIslandRepository implements IslandRepository {
+  constructor(private readonly pool: Pool) {}
+
+  async create(input: Island): Promise<Island> {
+    const result = await this.pool.query(
+      `INSERT INTO islands
+         (id, version, status, name, description, capabilities, runtime, permissions, provenance)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+       RETURNING ${ISLAND_COLUMNS}`,
+      [
+        input.id,
+        input.version,
+        input.status,
+        input.name,
+        input.description,
+        JSON.stringify(input.capabilities),
+        JSON.stringify(input.runtime),
+        JSON.stringify(input.permissions),
+        JSON.stringify(input.provenance),
+      ],
+    )
+    return mapIsland(result.rows[0])
+  }
+
+  async findById(id: string): Promise<Island | null> {
+    const result = await this.pool.query(`SELECT ${ISLAND_COLUMNS} FROM islands WHERE id = $1`, [
+      id,
+    ])
+    return maxVersion(result.rows.map(mapIsland))
+  }
+
+  async findLatestById(id: string): Promise<Island | null> {
+    return this.findById(id)
+  }
+
+  async listByIdentity(id: string): Promise<Island[]> {
+    const result = await this.pool.query(
+      `SELECT ${ISLAND_COLUMNS} FROM islands WHERE id = $1 ORDER BY version ASC`,
+      [id],
+    )
+    return result.rows.map(mapIsland)
+  }
+
+  async list(): Promise<Island[]> {
+    const result = await this.pool.query(`SELECT ${ISLAND_COLUMNS} FROM islands ORDER BY name ASC`)
+    return result.rows.map(mapIsland)
+  }
+
+  async listActive(): Promise<Island[]> {
+    const result = await this.pool.query(
+      `SELECT ${ISLAND_COLUMNS} FROM islands WHERE status = 'active' ORDER BY name ASC`,
+    )
+    return result.rows.map(mapIsland)
+  }
+
+  async updateStatus(id: string, status: IslandStatus): Promise<void> {
+    await this.pool.query(`UPDATE islands SET status = $2 WHERE id = $1`, [id, status])
   }
 }
 
 /** Pick the highest-version record (semver), independent of insert timing. */
-function maxVersion(records: ProblemSpecificationRecord[]): ProblemSpecificationRecord | null {
+function maxVersion<T extends { version: string }>(records: T[]): T | null {
   if (records.length === 0) {
     return null
   }

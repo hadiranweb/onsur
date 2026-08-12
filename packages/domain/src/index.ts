@@ -43,7 +43,11 @@ export {
   canIslandTransition,
   nextIslandState,
   canActivateIsland,
+  islandProvidesAll,
+  islandMatchScore,
+  resolveIsland,
 } from './rules/island'
+export type { IslandResolution } from './rules/island'
 
 export {
   processTransitions,
@@ -53,6 +57,7 @@ export {
   canProcessStepTransition,
   nextProcessStepState,
   validateProcess,
+  validateProcessSteps,
 } from './rules/process'
 
 export {

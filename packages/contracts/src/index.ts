@@ -60,12 +60,20 @@ export type {
 
 export {
   islandSchema,
+  islandManifestSchema,
   runtimeBindingSchema,
   runtimeKindSchema,
   islandStatusSchema,
   islandEventSchema,
 } from './island'
-export type { Island, RuntimeBinding, RuntimeKind, IslandStatus, IslandEvent } from './island'
+export type {
+  Island,
+  IslandManifest,
+  RuntimeBinding,
+  RuntimeKind,
+  IslandStatus,
+  IslandEvent,
+} from './island'
 
 export { agentSchema, agentRoleSchema } from './agent'
 export type { Agent, AgentRole } from './agent'

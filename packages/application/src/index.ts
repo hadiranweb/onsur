@@ -40,6 +40,26 @@ export type { WorkspaceAccess, WorkspaceServiceDeps } from './services/workspace
 export { FounderService } from './services/founder-service'
 export type { FounderServiceDeps, FounderSessionView } from './services/founder-service'
 
+export { CapabilityService } from './services/capability-service'
+export type { CapabilityServiceDeps, RegisterCapabilityInput } from './services/capability-service'
+
+export { ProcessService } from './services/process-service'
+export type { ProcessServiceDeps, CreateProcessInput } from './services/process-service'
+
+export { IslandService } from './services/island-service'
+export type {
+  IslandServiceDeps,
+  CreateIslandInput,
+  ResolveOrCreateResult,
+} from './services/island-service'
+
+export {
+  STRUCTURED_ANALYSIS_CAPABILITY,
+  structuredAnalysisIslandManifest,
+} from './reference-islands/structured-analysis'
+
+export { makeProvenance } from './util/provenance'
+
 export { FakeStructuredLlm, MalformedStructuredLlm } from './infrastructure/fake-structured-llm'
 
 export { createPgPool } from './infrastructure/pg'
@@ -51,6 +71,9 @@ export { PostgresMembershipRepository } from './infrastructure/postgres-reposito
 export { PostgresProblemRepository } from './infrastructure/postgres-repositories'
 export { PostgresProblemSpecificationRepository } from './infrastructure/postgres-repositories'
 export { PostgresSpsRepository } from './infrastructure/postgres-repositories'
+export { PostgresCapabilityRepository } from './infrastructure/postgres-repositories'
+export { PostgresProcessRepository } from './infrastructure/postgres-repositories'
+export { PostgresIslandRepository } from './infrastructure/postgres-repositories'
 export { ScryptPasswordHasher } from './infrastructure/scrypt-password-hasher'
 export { HmacSessionCodec } from './infrastructure/session-codec'
 export { readMigrations, runMigrations } from './infrastructure/migrate'

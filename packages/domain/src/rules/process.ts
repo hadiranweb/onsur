@@ -2,6 +2,7 @@ import type {
   Process,
   ProcessEvent,
   ProcessStatus,
+  ProcessStep,
   ProcessStepEvent,
   ProcessStepStatus,
 } from '@element-plus/contracts'
@@ -56,16 +57,16 @@ export function nextProcessStepState(
 }
 
 /**
- * Structural Process validation: step ids must be unique, step orders must be
- * unique, and every `dependsOn` reference must point at a step within the
+ * Structural Process-step validation: step ids must be unique, step orders must
+ * be unique, and every `dependsOn` reference must point at a step within the
  * same Process. Returns a list of violations (empty means valid).
  */
-export function validateProcess(process: Process): string[] {
+export function validateProcessSteps(steps: readonly ProcessStep[]): string[] {
   const errors: string[] = []
   const ids = new Set<string>()
   const orders = new Set<number>()
 
-  for (const step of process.steps) {
+  for (const step of steps) {
     if (ids.has(step.id)) {
       errors.push(`duplicate step id "${step.id}"`)
     }
@@ -77,7 +78,7 @@ export function validateProcess(process: Process): string[] {
     orders.add(step.order)
   }
 
-  for (const step of process.steps) {
+  for (const step of steps) {
     for (const dependency of step.dependsOn) {
       if (!ids.has(dependency)) {
         errors.push(`step "${step.id}" depends on unknown step "${dependency}"`)
@@ -86,4 +87,9 @@ export function validateProcess(process: Process): string[] {
   }
 
   return errors
+}
+
+/** Structural Process validation over the whole Process (delegates to steps). */
+export function validateProcess(process: Process): string[] {
+  return validateProcessSteps(process.steps)
 }

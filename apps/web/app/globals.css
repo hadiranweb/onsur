@@ -149,3 +149,8 @@ a {
 .founder__messages ol {
   padding-left: 1.25rem;
 }
+
+.founder__reused {
+  color: #2e7d32;
+  font-weight: 600;
+}

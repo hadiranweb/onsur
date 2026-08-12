@@ -14,6 +14,10 @@ import { provenanceSchema } from './provenance'
  * An Island is a deployable unit that binds capabilities to a runtime through
  * a RuntimeBinding. The runtime is an adapter (e.g. a fake or OpenClaw), never
  * Element Plus itself.
+ *
+ * An `IslandManifest` is the reusable declaration (name, description,
+ * capabilities, runtime binding, permissions); an `Island` is a manifest plus
+ * identity (id, version), lifecycle `status`, and `provenance`.
  */
 
 export const runtimeKindSchema = z.enum(['none', 'fake', 'openclaw'])
@@ -36,15 +40,20 @@ export const islandEventSchema = z.enum(['propose', 'activate', 'retire', 'rejec
 
 export type IslandEvent = z.infer<typeof islandEventSchema>
 
-export const islandSchema = z.object({
-  id: idSchema,
-  version: versionSchema,
-  status: islandStatusSchema,
+export const islandManifestSchema = z.object({
   name: z.string().min(1).max(200),
   description: z.string().min(1).max(4000),
   capabilities: z.array(referenceSchema).min(1),
   runtime: runtimeBindingSchema,
   permissions: z.array(z.string().min(1).max(200)).default([]),
+})
+
+export type IslandManifest = z.infer<typeof islandManifestSchema>
+
+export const islandSchema = islandManifestSchema.extend({
+  id: idSchema,
+  version: versionSchema,
+  status: islandStatusSchema,
   provenance: provenanceSchema,
 })
 

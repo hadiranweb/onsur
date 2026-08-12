@@ -188,4 +188,90 @@ describe('postgres persistence (integration)', () => {
       app.founder.confirm(bob.user, alicePersonal!.id, session.session.id),
     ).rejects.toMatchObject({ code: 'FORBIDDEN' })
   })
+
+  it('registers a capability and rejects a duplicate name', async () => {
+    const actor = (
+      await app.auth.register({
+        email: uniqueEmail(),
+        password: 'password123',
+        displayName: 'Cap Actor',
+      })
+    ).user
+
+    const capability = await app.capabilities.register({
+      name: `Search ${uniqueEmail()}`,
+      description: 'search the web',
+      actorUserId: actor.id,
+    })
+    expect(capability.version).toBe('1.0.0')
+
+    await expect(
+      app.capabilities.register({
+        name: capability.name,
+        description: 'again',
+        actorUserId: actor.id,
+      }),
+    ).rejects.toMatchObject({ code: 'CONFLICT' })
+  })
+
+  it('runs the full process + island lifecycle through real persistence', async () => {
+    const actor = (
+      await app.auth.register({
+        email: uniqueEmail(),
+        password: 'password123',
+        displayName: 'Registry Actor',
+      })
+    ).user
+
+    const process = await app.processes.createDraft({
+      title: 'Analyze IT',
+      description: 'analysis',
+      steps: [
+        {
+          id: 's1',
+          order: 0,
+          title: 'gather',
+          instruction: 'collect',
+          dependsOn: [],
+          status: 'pending',
+        },
+      ],
+      actorUserId: actor.id,
+    })
+    expect((await app.processes.publish(process.id)).status).toBe('published')
+
+    const island = await app.islands.createDraft({
+      manifest: {
+        name: 'IT Island',
+        description: 'integration island',
+        capabilities: [{ id: 'cap-it', kind: 'capability' }],
+        runtime: { runtime: 'fake', config: {} },
+        permissions: [],
+      },
+      actorUserId: actor.id,
+    })
+    expect((await app.islands.activate(island.id)).status).toBe('active')
+
+    const resolved = await app.islands.resolve(['cap-it'])
+    expect(resolved?.island.id).toBe(island.id)
+
+    const next = await app.islands.newVersion(island.id, { description: 'revised' }, actor.id)
+    expect(next.version).toBe('1.0.1')
+  })
+
+  it('ensureReferenceIsland is idempotent through real persistence', async () => {
+    const actor = (
+      await app.auth.register({
+        email: uniqueEmail(),
+        password: 'password123',
+        displayName: 'Ref Actor',
+      })
+    ).user
+
+    const first = await app.islands.ensureReferenceIsland({ actorUserId: actor.id })
+    const second = await app.islands.ensureReferenceIsland({ actorUserId: actor.id })
+    expect(first.reused).toBe(false)
+    expect(second.reused).toBe(true)
+    expect(second.island.id).toBe(first.island.id)
+  })
 })

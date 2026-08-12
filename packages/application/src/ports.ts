@@ -1,5 +1,10 @@
 import type {
+  Capability,
+  Island,
+  IslandStatus,
   ProblemItem,
+  Process,
+  ProcessStatus,
   Provenance,
   SpsStatus,
   StructuredProblemOutput,
@@ -213,4 +218,35 @@ export interface StructuredLlmPort {
 export interface StructuredLlmRequest {
   rawProblem: string
   corrections: string[]
+}
+
+// ---------------------------------------------------------------------------
+// Capability / Process / Island registries (Sprint 04)
+// ---------------------------------------------------------------------------
+
+export interface CapabilityRepository {
+  create(input: Capability): Promise<Capability>
+  findById(id: string): Promise<Capability | null>
+  findLatestById(id: string): Promise<Capability | null>
+  findLatestByName(name: string): Promise<Capability | null>
+  list(): Promise<Capability[]>
+}
+
+export interface ProcessRepository {
+  create(input: Process): Promise<Process>
+  findById(id: string): Promise<Process | null>
+  findLatestById(id: string): Promise<Process | null>
+  listByIdentity(id: string): Promise<Process[]>
+  list(): Promise<Process[]>
+  updateStatus(id: string, status: ProcessStatus): Promise<void>
+}
+
+export interface IslandRepository {
+  create(input: Island): Promise<Island>
+  findById(id: string): Promise<Island | null>
+  findLatestById(id: string): Promise<Island | null>
+  listByIdentity(id: string): Promise<Island[]>
+  list(): Promise<Island[]>
+  listActive(): Promise<Island[]>
+  updateStatus(id: string, status: IslandStatus): Promise<void>
 }
