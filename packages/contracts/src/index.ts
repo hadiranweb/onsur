@@ -1,10 +1,123 @@
 /**
  * @element-plus/contracts
  *
- * Canonical Zod schemas for Element Plus (عنصر پلاس). Sprint 00 ships the
- * environment contract; the canonical domain language (IDs/references,
- * ProblemSpecification, Evidence, Process, Island, Run, ...) arrives in
- * Sprint 01.
+ * Canonical Zod schemas for Element Plus (عنصر پلاس): the executable form of
+ * the canonical domain language.
  */
-export { envSchema, getEnv, parseEnv } from './env'
+export { idSchema, entityKindSchema, referenceSchema, versionSchema, timestampSchema } from './ids'
+export type { Id, EntityKind, Reference, Version, Timestamp } from './ids'
+
+export { provenanceSchema, provenanceSourceSchema } from './provenance'
+export type { Provenance, ProvenanceSource } from './provenance'
+
+export {
+  problemSpecificationSchema,
+  problemItemSchema,
+  problemStatusSchema,
+  evidenceKindSchema,
+} from './problem'
+export type { ProblemSpecification, ProblemItem, ProblemStatus, EvidenceKind } from './problem'
+
+export { evidenceSchema, evidenceStatusSchema, evidenceEventSchema } from './evidence'
+export type { Evidence, EvidenceStatus, EvidenceEvent } from './evidence'
+
+export { capabilitySchema } from './capability'
+export type { Capability } from './capability'
+
+export {
+  processSchema,
+  processStepSchema,
+  processStatusSchema,
+  processEventSchema,
+  processStepStatusSchema,
+  processStepEventSchema,
+} from './process'
+export type {
+  Process,
+  ProcessStep,
+  ProcessStatus,
+  ProcessEvent,
+  ProcessStepStatus,
+  ProcessStepEvent,
+} from './process'
+
+export {
+  islandSchema,
+  runtimeBindingSchema,
+  runtimeKindSchema,
+  islandStatusSchema,
+  islandEventSchema,
+} from './island'
+export type { Island, RuntimeBinding, RuntimeKind, IslandStatus, IslandEvent } from './island'
+
+export { agentSchema, agentRoleSchema } from './agent'
+export type { Agent, AgentRole } from './agent'
+
+export { toolContractSchema, toolCallSchema, effectRecordSchema, effectKindSchema } from './tool'
+export type { ToolContract, ToolCall, EffectRecord, EffectKind } from './tool'
+
+export { packageEnvelopeSchema, packageKindSchema } from './package'
+export type { PackageEnvelope, PackageKind } from './package'
+
+export {
+  runSchema,
+  runSnapshotSchema,
+  runEventSchema,
+  runStatusSchema,
+  runEventTypeSchema,
+  artifactSchema,
+  artifactKindSchema,
+} from './run'
+export type {
+  Run,
+  RunSnapshot,
+  RunEvent,
+  RunStatus,
+  RunEventType,
+  Artifact,
+  ArtifactKind,
+} from './run'
+
+export {
+  evaluationSchema,
+  evaluationCriterionSchema,
+  evaluationVerdictSchema,
+  feedbackSchema,
+  feedbackStatusSchema,
+  feedbackEventSchema,
+} from './evaluation'
+export type {
+  Evaluation,
+  EvaluationCriterion,
+  EvaluationVerdict,
+  Feedback,
+  FeedbackStatus,
+  FeedbackEvent,
+} from './evaluation'
+
+export { memoryEntrySchema, memoryScopeSchema, memoryStatusSchema } from './memory'
+export type { MemoryEntry, MemoryScope, MemoryStatus } from './memory'
+
+export {
+  knowledgeSchema,
+  knowledgeStatusSchema,
+  versionProposalSchema,
+  versionProposalStatusSchema,
+  versionProposalEventSchema,
+} from './knowledge'
+export type {
+  Knowledge,
+  KnowledgeStatus,
+  VersionProposal,
+  VersionProposalStatus,
+  VersionProposalEvent,
+} from './knowledge'
+
+export { assetSchema, assetKindSchema, assetVisibilitySchema } from './asset'
+export type { Asset, AssetKind, AssetVisibility } from './asset'
+
+export { auditEventSchema, auditOutcomeSchema } from './audit'
+export type { AuditEvent, AuditOutcome } from './audit'
+
+export { envSchema, parseEnv, getEnv } from './env'
 export type { Env, EnvResult } from './env'

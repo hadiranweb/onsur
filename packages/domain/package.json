@@ -16,6 +16,9 @@
     "build": "tsc --noEmit",
     "test": "vitest run"
   },
+  "dependencies": {
+    "@element-plus/contracts": "workspace:*"
+  },
   "devDependencies": {
     "@types/node": "^22.20.0",
     "typescript": "^5.9.3",

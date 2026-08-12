@@ -18,7 +18,7 @@ const root = join(dirname(fileURLToPath(import.meta.url)), '..')
 
 /** Allowed internal (workspace) dependencies, keyed by package name. */
 const ALLOWED_INTERNAL = {
-  '@element-plus/domain': [],
+  '@element-plus/domain': ['@element-plus/contracts'],
   '@element-plus/contracts': [],
   '@element-plus/application': ['@element-plus/domain', '@element-plus/contracts'],
   '@element-plus/web': [
@@ -104,9 +104,9 @@ for (const pkg of packages) {
     }
     const pureLayer = pkg.name === '@element-plus/domain' || pkg.name === '@element-plus/contracts'
     const runtimeSection = meta.section === 'dependencies' || meta.section === 'peerDependencies'
-    if (pureLayer && runtimeSection && (isInternal || isForbiddenRuntime(dep))) {
+    if (pureLayer && runtimeSection && isForbiddenRuntime(dep)) {
       errors.push(
-        `${pkg.name}: forbidden runtime dependency ${dep} (${meta.section}) — pure layers must not depend on frameworks/runtime/other packages`,
+        `${pkg.name}: forbidden runtime dependency ${dep} (${meta.section}) — pure layers must not depend on frameworks/runtime`,
       )
     }
   }

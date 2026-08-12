@@ -1,16 +1,73 @@
 /**
  * @element-plus/domain
  *
- * Pure domain layer for Element Plus (عنصر پلاس).
+ * Pure domain rules for Element Plus (عنصر پلاس): lifecycle/state-transition
+ * tables, version invariants, structural validation, and published-object
+ * immutability semantics.
  *
- * Owned boundaries: identity, workspace, problem, SPS, process, island, run,
- * package, authority, evidence, memory, knowledge, provenance, assets.
- *
- * Non-negotiable: this layer must remain free of Next.js, React, PostgreSQL
- * drivers, OpenClaw, and LLM/provider SDKs. This is enforced by the
- * architecture guard (`pnpm check:arch`) and by the architecture test in
- * `src/__tests__/architecture.test.ts`.
- *
- * Sprint 00: boundaries only — no product functionality yet.
+ * This layer is free of Next.js, React, PostgreSQL drivers, OpenClaw, and
+ * LLM/provider SDKs. It depends on `@element-plus/contracts` for *types only*
+ * (enforced by the architecture test in `src/__tests__/architecture.test.ts`).
  */
-export {}
+export { canTransition, nextState } from './rules/state-machine'
+export type { TransitionTable } from './rules/state-machine'
+
+export {
+  parseVersion,
+  compareVersions,
+  isVersionGreater,
+  assertNewVersion,
+  canPublishVersion,
+} from './rules/version'
+export type { SemverTriple } from './rules/version'
+
+export {
+  deepFreeze,
+  publishObject,
+  assertMutable,
+  mutateObject,
+  isPublishedStatus,
+} from './rules/immutability'
+
+export {
+  runTransitions,
+  terminalRunStatuses,
+  isTerminalRunStatus,
+  canRunTransition,
+  nextRunState,
+} from './rules/run'
+
+export {
+  islandTransitions,
+  canIslandTransition,
+  nextIslandState,
+  canActivateIsland,
+} from './rules/island'
+
+export {
+  processTransitions,
+  processStepTransitions,
+  canProcessTransition,
+  nextProcessState,
+  canProcessStepTransition,
+  nextProcessStepState,
+  validateProcess,
+} from './rules/process'
+
+export {
+  evidenceTransitions,
+  canEvidenceTransition,
+  nextEvidenceState,
+  isExactDuplicate,
+  findExactDuplicates,
+} from './rules/evidence'
+
+export { feedbackTransitions, canFeedbackTransition, nextFeedbackState } from './rules/feedback'
+
+export {
+  versionProposalTransitions,
+  canProposalTransition,
+  nextProposalState,
+  isForwardProposal,
+  canMergeProposal,
+} from './rules/knowledge'
