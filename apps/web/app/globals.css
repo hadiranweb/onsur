@@ -154,3 +154,26 @@ a {
   color: #2e7d32;
   font-weight: 600;
 }
+
+.run__approvals,
+.run__timeline,
+.run__toolcalls,
+.run__effects,
+.run__artifacts,
+.run__evaluations {
+  margin-bottom: 1.5rem;
+}
+
+.run__approval {
+  border: 1px solid #c0392b;
+  padding: 0.75rem;
+  margin-bottom: 0.75rem;
+}
+
+.run__timeline ol,
+.run__toolcalls ul,
+.run__effects ul,
+.run__artifacts ul,
+.run__evaluations ul {
+  padding-left: 1.25rem;
+}

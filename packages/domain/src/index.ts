@@ -85,3 +85,5 @@ export { isSessionActive, validatePassword } from './rules/identity'
 export type { SessionLike } from './rules/identity'
 
 export { spsTransitions, canSpsTransition, nextSpsState } from './rules/sps'
+
+export { requiresApproval, isToolExecutionAuthorized } from './rules/authority'

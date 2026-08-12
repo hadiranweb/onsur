@@ -2,6 +2,7 @@ import type { Pool } from 'pg'
 import { createPgPool } from './infrastructure/pg'
 import { createPostgresRepositories } from './infrastructure/postgres-repositories'
 import { FakeStructuredLlm } from './infrastructure/fake-structured-llm'
+import { InMemoryToolRegistry } from './infrastructure/tool-registry'
 import { ScryptPasswordHasher } from './infrastructure/scrypt-password-hasher'
 import { HmacSessionCodec } from './infrastructure/session-codec'
 import { AuthService } from './services/auth-service'
@@ -9,6 +10,7 @@ import { CapabilityService } from './services/capability-service'
 import { FounderService } from './services/founder-service'
 import { IslandService } from './services/island-service'
 import { ProcessService } from './services/process-service'
+import { RunEngine } from './services/run-engine'
 import { WorkspaceService } from './services/workspace-service'
 import type { StructuredLlmPort } from './ports'
 
@@ -19,6 +21,7 @@ export interface AppServices {
   capabilities: CapabilityService
   processes: ProcessService
   islands: IslandService
+  runs: RunEngine
   pool: Pool
   close(): Promise<void>
 }
@@ -68,6 +71,19 @@ export function createAppServices(config: AppServicesConfig): AppServices {
 
   const islands = new IslandService({ islands: repositories.islands, capabilities })
 
+  const runs = new RunEngine({
+    runs: repositories.runs,
+    approvals: repositories.approvals,
+    toolCalls: repositories.toolCalls,
+    effects: repositories.effects,
+    artifacts: repositories.artifacts,
+    evaluations: repositories.evaluations,
+    specifications: repositories.specifications,
+    registry: new InMemoryToolRegistry(),
+    islands,
+    processes,
+  })
+
   return {
     auth,
     workspaces,
@@ -75,6 +91,7 @@ export function createAppServices(config: AppServicesConfig): AppServices {
     capabilities,
     processes,
     islands,
+    runs,
     pool,
     async close() {
       await pool.end()

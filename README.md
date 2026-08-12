@@ -15,9 +15,10 @@ versioned knowledge.
 - Sprint 01 (canonical contracts + domain core): **done**
 - Sprint 02 (PostgreSQL + identity + workspace): **done**
 - Sprint 03 (Founder + structured problem solving): **done**
-- Sprint 04 (capability + process + island): **in progress**
-- Sprint 05+ (run engine, OpenClaw, evidence/memory/knowledge, packages,
-  marketplace, hardening): planned — see the sprint roadmap below.
+- Sprint 04 (capability + process + island): **done**
+- Sprint 05 (run engine + fake runtime): **in progress**
+- Sprint 06+ (OpenClaw, evidence/memory/knowledge, packages, marketplace,
+  hardening): planned — see the sprint roadmap below.
 
 ## Architecture
 
@@ -128,8 +129,8 @@ environment validation and database connectivity honestly
 | 01     | Canonical contracts + domain core          | done    |
 | 02     | PostgreSQL + identity + workspace          | done    |
 | 03     | Founder + structured problem solving       | done    |
-| 04     | Capability + process + island              | current |
-| 05     | Run engine + fake runtime                  | planned |
+| 04     | Capability + process + island              | done    |
+| 05     | Run engine + fake runtime                  | current |
 | 06     | OpenClaw adapter                           | planned |
 | 07     | Evidence + feedback + memory               | planned |
 | 08     | Knowledge governance + evolution           | planned |

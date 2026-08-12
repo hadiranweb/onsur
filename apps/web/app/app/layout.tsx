@@ -18,6 +18,7 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
           <Link href="/app">Home</Link>
           <Link href="/app/founder">Founder</Link>
           <Link href="/app/islands">Islands</Link>
+          <Link href="/app/runs">Runs</Link>
           <span className="shell__user">{user.displayName}</span>
           <form action="/api/auth/logout" method="post">
             <button type="submit">Log out</button>

@@ -1,6 +1,10 @@
+import { randomUUID } from 'node:crypto'
 import type { Pool } from 'pg'
 import type {
+  ArtifactKind,
   Capability,
+  EffectKind,
+  Evaluation,
   Island,
   IslandStatus,
   ProblemItem,
@@ -8,13 +12,23 @@ import type {
   ProcessStatus,
   Provenance,
   Reference,
+  RunEventType,
+  RunSnapshot,
+  RunStatus,
   SpsStatus,
   WorkspaceRole,
 } from '@element-plus/contracts'
 import { compareVersions } from '@element-plus/domain'
 import { UniqueViolationError } from '../errors'
 import type {
+  ApprovalRecord,
+  ApprovalRepository,
+  ArtifactRecord,
+  ArtifactRepository,
   CapabilityRepository,
+  EffectRecordRow,
+  EffectRepository,
+  EvaluationRepository,
   IslandRepository,
   MembershipRecord,
   MembershipRepository,
@@ -23,11 +37,17 @@ import type {
   ProblemSpecificationRecord,
   ProblemSpecificationRepository,
   ProcessRepository,
+  RunEventRecord,
+  RunRecord,
+  RunRepository,
   SessionRecord,
   SessionRepository,
   SpsMessageRecord,
   SpsRepository,
   SpsSessionRecord,
+  ToolCallRecord,
+  ToolCallRepository,
+  ToolCallStatus,
   UserRecord,
   UserRepository,
   WorkspaceRecord,
@@ -409,6 +429,11 @@ export class PostgresProblemSpecificationRepository implements ProblemSpecificat
     return result.rows[0] ? mapSpecification(result.rows[0]) : null
   }
 
+  async findById(id: string): Promise<ProblemSpecificationRecord | null> {
+    const result = await this.pool.query(`SELECT * FROM problem_specifications WHERE id = $1`, [id])
+    return result.rows[0] ? mapSpecification(result.rows[0]) : null
+  }
+
   async findLatestByProblem(problemId: string): Promise<ProblemSpecificationRecord | null> {
     const result = await this.pool.query(
       `SELECT * FROM problem_specifications WHERE problem_id = $1`,
@@ -515,6 +540,12 @@ export interface PostgresRepositories {
   capabilities: CapabilityRepository
   processes: ProcessRepository
   islands: IslandRepository
+  runs: RunRepository
+  approvals: ApprovalRepository
+  toolCalls: ToolCallRepository
+  effects: EffectRepository
+  artifacts: ArtifactRepository
+  evaluations: EvaluationRepository
 }
 
 export function createPostgresRepositories(pool: Pool): PostgresRepositories {
@@ -529,6 +560,12 @@ export function createPostgresRepositories(pool: Pool): PostgresRepositories {
     capabilities: new PostgresCapabilityRepository(pool),
     processes: new PostgresProcessRepository(pool),
     islands: new PostgresIslandRepository(pool),
+    runs: new PostgresRunRepository(pool),
+    approvals: new PostgresApprovalRepository(pool),
+    toolCalls: new PostgresToolCallRepository(pool),
+    effects: new PostgresEffectRepository(pool),
+    artifacts: new PostgresArtifactRepository(pool),
+    evaluations: new PostgresEvaluationRepository(pool),
   }
 }
 
@@ -731,6 +768,329 @@ export class PostgresIslandRepository implements IslandRepository {
 
   async updateStatus(id: string, status: IslandStatus): Promise<void> {
     await this.pool.query(`UPDATE islands SET status = $2 WHERE id = $1`, [id, status])
+  }
+}
+
+function mapRun(row: Record<string, unknown>): RunRecord {
+  return {
+    id: row.id as string,
+    status: row.status as RunStatus,
+    snapshot: row.snapshot as RunSnapshot,
+    provenance: row.provenance as Provenance,
+    createdAt: toIso(row.created_at),
+    updatedAt: toIso(row.updated_at),
+  }
+}
+
+function mapRunEvent(row: Record<string, unknown>): RunEventRecord {
+  return {
+    id: row.id as string,
+    runId: row.run_id as string,
+    seq: Number(row.seq),
+    type: row.type as RunEventType,
+    at: toIso(row.at),
+    payload: (row.payload as Record<string, unknown>) ?? {},
+  }
+}
+
+function mapApproval(row: Record<string, unknown>): ApprovalRecord {
+  return {
+    id: row.id as string,
+    runId: row.run_id as string,
+    toolCallId: row.tool_call_id as string,
+    effectKind: row.effect_kind as EffectKind,
+    status: row.status as 'pending' | 'approved' | 'rejected',
+    requestedAt: toIso(row.requested_at),
+    decidedAt: row.decided_at == null ? null : toIso(row.decided_at),
+    decidedBy: (row.decided_by as string | null) ?? null,
+  }
+}
+
+function mapToolCall(row: Record<string, unknown>): ToolCallRecord {
+  return {
+    id: row.id as string,
+    runId: row.run_id as string,
+    toolId: row.tool_id as string,
+    toolName: row.tool_name as string,
+    arguments: (row.arguments as Record<string, unknown>) ?? {},
+    effectKind: row.effect_kind as EffectKind,
+    requiresApproval: Boolean(row.requires_approval),
+    status: row.status as ToolCallStatus,
+    createdAt: toIso(row.created_at),
+  }
+}
+
+function mapEffect(row: Record<string, unknown>): EffectRecordRow {
+  return {
+    id: row.id as string,
+    runId: row.run_id as string,
+    toolCallId: row.tool_call_id as string,
+    kind: row.kind as EffectKind,
+    description: row.description as string,
+    occurredAt: toIso(row.occurred_at),
+    reverted: Boolean(row.reverted),
+  }
+}
+
+function mapArtifact(row: Record<string, unknown>): ArtifactRecord {
+  return {
+    id: row.id as string,
+    runId: row.run_id as string,
+    kind: row.kind as ArtifactKind,
+    mimeType: row.mime_type as string,
+    sizeBytes: row.size_bytes == null ? null : Number(row.size_bytes),
+    data: row.data as unknown,
+    provenance: row.provenance as Provenance,
+    createdAt: toIso(row.created_at),
+  }
+}
+
+function mapEvaluation(row: Record<string, unknown>): Evaluation {
+  return {
+    id: row.id as string,
+    runId: row.run_id as Evaluation['runId'],
+    verdict: row.verdict as Evaluation['verdict'],
+    score: row.score == null ? undefined : Number(row.score),
+    criteria: (row.criteria as Evaluation['criteria']) ?? [],
+    provenance: row.provenance as Provenance,
+  }
+}
+
+export class PostgresRunRepository implements RunRepository {
+  constructor(private readonly pool: Pool) {}
+
+  async create(input: RunRecord): Promise<RunRecord> {
+    const result = await this.pool.query(
+      `INSERT INTO runs (id, status, snapshot, provenance)
+       VALUES ($1, $2, $3, $4)
+       RETURNING id, status, snapshot, provenance, created_at, updated_at`,
+      [input.id, input.status, JSON.stringify(input.snapshot), JSON.stringify(input.provenance)],
+    )
+    return mapRun(result.rows[0])
+  }
+
+  async findById(id: string): Promise<RunRecord | null> {
+    const result = await this.pool.query(
+      `SELECT id, status, snapshot, provenance, created_at, updated_at FROM runs WHERE id = $1`,
+      [id],
+    )
+    return result.rows[0] ? mapRun(result.rows[0]) : null
+  }
+
+  async updateStatus(id: string, status: RunStatus): Promise<RunRecord> {
+    const result = await this.pool.query(
+      `UPDATE runs SET status = $2, updated_at = now() WHERE id = $1
+       RETURNING id, status, snapshot, provenance, created_at, updated_at`,
+      [id, status],
+    )
+    return mapRun(result.rows[0])
+  }
+
+  async appendEvent(input: {
+    runId: string
+    type: RunEventType
+    payload?: Record<string, unknown>
+  }): Promise<RunEventRecord> {
+    const result = await this.pool.query(
+      `INSERT INTO run_events (id, run_id, seq, type, payload)
+       VALUES ($1, $2,
+         (SELECT COALESCE(MAX(seq), 0) + 1 FROM run_events WHERE run_id = $2),
+         $3, $4)
+       RETURNING id, run_id, seq, type, at, payload`,
+      [randomUUID(), input.runId, input.type, JSON.stringify(input.payload ?? {})],
+    )
+    return mapRunEvent(result.rows[0])
+  }
+
+  async listEvents(runId: string): Promise<RunEventRecord[]> {
+    const result = await this.pool.query(
+      `SELECT id, run_id, seq, type, at, payload FROM run_events WHERE run_id = $1 ORDER BY seq ASC`,
+      [runId],
+    )
+    return result.rows.map(mapRunEvent)
+  }
+
+  async list(): Promise<RunRecord[]> {
+    const result = await this.pool.query(
+      `SELECT id, status, snapshot, provenance, created_at, updated_at FROM runs ORDER BY created_at DESC`,
+    )
+    return result.rows.map(mapRun)
+  }
+}
+
+export class PostgresApprovalRepository implements ApprovalRepository {
+  constructor(private readonly pool: Pool) {}
+
+  async create(input: Omit<ApprovalRecord, 'requestedAt'>): Promise<ApprovalRecord> {
+    const result = await this.pool.query(
+      `INSERT INTO approvals (id, run_id, tool_call_id, effect_kind, status)
+       VALUES ($1, $2, $3, $4, $5)
+       RETURNING id, run_id, tool_call_id, effect_kind, status, requested_at, decided_at, decided_by`,
+      [input.id, input.runId, input.toolCallId, input.effectKind, input.status],
+    )
+    return mapApproval(result.rows[0])
+  }
+
+  async findById(id: string): Promise<ApprovalRecord | null> {
+    const result = await this.pool.query(
+      `SELECT id, run_id, tool_call_id, effect_kind, status, requested_at, decided_at, decided_by
+         FROM approvals WHERE id = $1`,
+      [id],
+    )
+    return result.rows[0] ? mapApproval(result.rows[0]) : null
+  }
+
+  async listByRun(runId: string): Promise<ApprovalRecord[]> {
+    const result = await this.pool.query(
+      `SELECT id, run_id, tool_call_id, effect_kind, status, requested_at, decided_at, decided_by
+         FROM approvals WHERE run_id = $1 ORDER BY requested_at ASC`,
+      [runId],
+    )
+    return result.rows.map(mapApproval)
+  }
+
+  async decide(
+    id: string,
+    status: 'approved' | 'rejected',
+    decidedBy: string,
+  ): Promise<ApprovalRecord> {
+    const result = await this.pool.query(
+      `UPDATE approvals SET status = $2, decided_at = now(), decided_by = $3 WHERE id = $1
+       RETURNING id, run_id, tool_call_id, effect_kind, status, requested_at, decided_at, decided_by`,
+      [id, status, decidedBy],
+    )
+    return mapApproval(result.rows[0])
+  }
+}
+
+export class PostgresToolCallRepository implements ToolCallRepository {
+  constructor(private readonly pool: Pool) {}
+
+  async create(input: Omit<ToolCallRecord, 'createdAt'>): Promise<ToolCallRecord> {
+    const result = await this.pool.query(
+      `INSERT INTO tool_calls
+         (id, run_id, tool_id, tool_name, arguments, effect_kind, requires_approval, status)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+       RETURNING id, run_id, tool_id, tool_name, arguments, effect_kind, requires_approval, status, created_at`,
+      [
+        input.id,
+        input.runId,
+        input.toolId,
+        input.toolName,
+        JSON.stringify(input.arguments),
+        input.effectKind,
+        input.requiresApproval,
+        input.status,
+      ],
+    )
+    return mapToolCall(result.rows[0])
+  }
+
+  async findById(id: string): Promise<ToolCallRecord | null> {
+    const result = await this.pool.query(
+      `SELECT id, run_id, tool_id, tool_name, arguments, effect_kind, requires_approval, status, created_at
+         FROM tool_calls WHERE id = $1`,
+      [id],
+    )
+    return result.rows[0] ? mapToolCall(result.rows[0]) : null
+  }
+
+  async listByRun(runId: string): Promise<ToolCallRecord[]> {
+    const result = await this.pool.query(
+      `SELECT id, run_id, tool_id, tool_name, arguments, effect_kind, requires_approval, status, created_at
+         FROM tool_calls WHERE run_id = $1 ORDER BY created_at ASC`,
+      [runId],
+    )
+    return result.rows.map(mapToolCall)
+  }
+
+  async updateStatus(id: string, status: ToolCallStatus): Promise<void> {
+    await this.pool.query(`UPDATE tool_calls SET status = $2 WHERE id = $1`, [id, status])
+  }
+}
+
+export class PostgresEffectRepository implements EffectRepository {
+  constructor(private readonly pool: Pool) {}
+
+  async create(input: Omit<EffectRecordRow, 'occurredAt'>): Promise<EffectRecordRow> {
+    const result = await this.pool.query(
+      `INSERT INTO effect_records (id, run_id, tool_call_id, kind, description, reverted)
+       VALUES ($1, $2, $3, $4, $5, $6)
+       RETURNING id, run_id, tool_call_id, kind, description, occurred_at, reverted`,
+      [input.id, input.runId, input.toolCallId, input.kind, input.description, input.reverted],
+    )
+    return mapEffect(result.rows[0])
+  }
+
+  async listByRun(runId: string): Promise<EffectRecordRow[]> {
+    const result = await this.pool.query(
+      `SELECT id, run_id, tool_call_id, kind, description, occurred_at, reverted
+         FROM effect_records WHERE run_id = $1 ORDER BY occurred_at ASC`,
+      [runId],
+    )
+    return result.rows.map(mapEffect)
+  }
+}
+
+export class PostgresArtifactRepository implements ArtifactRepository {
+  constructor(private readonly pool: Pool) {}
+
+  async create(input: Omit<ArtifactRecord, 'createdAt'>): Promise<ArtifactRecord> {
+    const result = await this.pool.query(
+      `INSERT INTO artifacts (id, run_id, kind, mime_type, size_bytes, data, provenance)
+       VALUES ($1, $2, $3, $4, $5, $6, $7)
+       RETURNING id, run_id, kind, mime_type, size_bytes, data, provenance, created_at`,
+      [
+        input.id,
+        input.runId,
+        input.kind,
+        input.mimeType,
+        input.sizeBytes,
+        JSON.stringify(input.data),
+        JSON.stringify(input.provenance),
+      ],
+    )
+    return mapArtifact(result.rows[0])
+  }
+
+  async listByRun(runId: string): Promise<ArtifactRecord[]> {
+    const result = await this.pool.query(
+      `SELECT id, run_id, kind, mime_type, size_bytes, data, provenance, created_at
+         FROM artifacts WHERE run_id = $1 ORDER BY created_at ASC`,
+      [runId],
+    )
+    return result.rows.map(mapArtifact)
+  }
+}
+
+export class PostgresEvaluationRepository implements EvaluationRepository {
+  constructor(private readonly pool: Pool) {}
+
+  async create(input: Evaluation): Promise<Evaluation> {
+    const result = await this.pool.query(
+      `INSERT INTO evaluations (id, run_id, verdict, score, criteria, provenance)
+       VALUES ($1, $2, $3, $4, $5, $6)
+       RETURNING id, run_id, verdict, score, criteria, provenance, created_at`,
+      [
+        input.id,
+        input.runId.id,
+        input.verdict,
+        input.score ?? null,
+        JSON.stringify(input.criteria ?? []),
+        JSON.stringify(input.provenance),
+      ],
+    )
+    const row = result.rows[0]
+    return mapEvaluation(row)
+  }
+
+  async listByRun(runId: string): Promise<Evaluation[]> {
+    const result = await this.pool.query(
+      `SELECT id, run_id, verdict, score, criteria, provenance, created_at
+         FROM evaluations WHERE run_id = $1 ORDER BY created_at ASC`,
+      [runId],
+    )
+    return result.rows.map(mapEvaluation)
   }
 }
 

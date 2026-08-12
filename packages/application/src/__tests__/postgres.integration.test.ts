@@ -3,8 +3,13 @@ import { PGlite } from '@electric-sql/pglite'
 import { PGLiteSocketServer } from '@electric-sql/pglite-socket'
 import { Pool } from 'pg'
 import { createAppServices } from '../app'
+import { createPostgresRepositories } from '../infrastructure/postgres-repositories'
+import { InMemoryToolRegistry } from '../infrastructure/tool-registry'
+import { FakeRuntimeAdapter } from '../infrastructure/fake-runtime-adapter'
+import { RunEngine } from '../services/run-engine'
 import { runMigrations } from '../infrastructure/migrate'
 import type { AppServices } from '../app'
+import type { RunView } from '../services/run-engine'
 
 /**
  * Integration tests against real PostgreSQL semantics (PGlite engine served
@@ -274,4 +279,117 @@ describe('postgres persistence (integration)', () => {
     expect(second.reused).toBe(true)
     expect(second.island.id).toBe(first.island.id)
   })
+
+  it('runs the Structured Analysis island end-to-end on the fake runtime (real persistence)', async () => {
+    const registered = await app.auth.register({
+      email: uniqueEmail(),
+      password: 'password123',
+      displayName: 'Run Actor',
+    })
+    const personal = await app.workspaces.getPersonalWorkspace(registered.user.id)
+
+    const ref = await app.islands.ensureReferenceIsland({ actorUserId: registered.user.id })
+    const started = await app.founder.start(
+      registered.user,
+      personal!.id,
+      'Integration problem for a structured analysis run.',
+    )
+    const confirmed = await app.founder.confirm(registered.user, personal!.id, started.session.id)
+    const specId = confirmed.confirmed!.id
+
+    const run = await app.runs.enqueue({
+      actorUserId: registered.user.id,
+      islandId: ref.island.id,
+      problemSpecId: specId,
+    })
+
+    const view = await waitForRunStatus(app.runs, run.id, ['completed'])
+    expect(view.run.status).toBe('completed')
+    expect(view.artifacts).toHaveLength(1)
+    expect(view.toolCalls[0]!.toolName).toBe('Analyze')
+    expect(view.effects).toHaveLength(0)
+
+    const evaluation = await app.runs.evaluate({ id: registered.user.id }, run.id, {
+      verdict: 'pass',
+      score: 0.8,
+    })
+    expect(evaluation.verdict).toBe('pass')
+  })
+
+  it('records a rejected irreversible effect without executing it (real persistence)', async () => {
+    const registered = await app.auth.register({
+      email: uniqueEmail(),
+      password: 'password123',
+      displayName: 'Reject Actor',
+    })
+    const personal = await app.workspaces.getPersonalWorkspace(registered.user.id)
+
+    const ref = await app.islands.ensureReferenceIsland({ actorUserId: registered.user.id })
+    const started = await app.founder.start(
+      registered.user,
+      personal!.id,
+      'Problem that will trigger an irreversible effect.',
+    )
+    const confirmed = await app.founder.confirm(registered.user, personal!.id, started.session.id)
+
+    // A second run engine over the same pool with a script that requests the
+    // irreversible tool.
+    const repos = createPostgresRepositories(pool)
+    const engine = new RunEngine({
+      runs: repos.runs,
+      approvals: repos.approvals,
+      toolCalls: repos.toolCalls,
+      effects: repos.effects,
+      artifacts: repos.artifacts,
+      evaluations: repos.evaluations,
+      specifications: repos.specifications,
+      registry: new InMemoryToolRegistry(),
+      islands: app.islands,
+      processes: app.processes,
+      runtimeFactory: (_island, gate) =>
+        new FakeRuntimeAdapter({
+          script: [{ toolId: 'tool-send-email', arguments: { to: 'x@example.com' } }],
+          gate,
+        }),
+    })
+
+    const run = await engine.enqueue({
+      actorUserId: registered.user.id,
+      islandId: ref.island.id,
+      problemSpecId: confirmed.confirmed!.id,
+    })
+
+    const paused = await waitForRunStatus(engine, run.id, ['awaiting_approval'])
+    expect(paused.approvals[0]!.status).toBe('pending')
+
+    await engine.decideApproval(
+      { id: registered.user.id },
+      run.id,
+      paused.approvals[0]!.id,
+      'reject',
+    )
+
+    const view = await waitForRunStatus(engine, run.id, ['completed'])
+    expect(view.run.status).toBe('completed')
+    expect(view.toolCalls[0]!.status).toBe('rejected')
+    expect(view.effects).toHaveLength(0)
+    expect(view.approvals[0]!.status).toBe('rejected')
+    expect(view.events.map((event) => event.type)).toContain('reject')
+  })
 })
+
+async function waitForRunStatus(
+  engine: RunEngine,
+  runId: string,
+  statuses: string[],
+  timeoutMs = 5000,
+): Promise<RunView> {
+  const start = Date.now()
+  let view: RunView
+  do {
+    view = await engine.get(runId)
+    if (statuses.includes(view.run.status)) return view
+    await new Promise((resolve) => setTimeout(resolve, 10))
+  } while (Date.now() - start < timeoutMs)
+  return view
+}

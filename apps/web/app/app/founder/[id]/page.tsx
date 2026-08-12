@@ -55,6 +55,9 @@ export default async function FounderSession({
       {confirmed && (
         <section className="founder__confirmed">
           <h2>Confirmed ProblemSpecification — v{confirmed.version}</h2>
+          <p>
+            Specification id: <code>{confirmed.id}</code> (use this to start a Run)
+          </p>
           <StructuredView draft={confirmed} />
         </section>
       )}

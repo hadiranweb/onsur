@@ -1,13 +1,20 @@
 import type {
+  ArtifactKind,
   Capability,
+  EffectKind,
+  Evaluation,
   Island,
   IslandStatus,
   ProblemItem,
   Process,
   ProcessStatus,
   Provenance,
+  RunEventType,
+  RunSnapshot,
+  RunStatus,
   SpsStatus,
   StructuredProblemOutput,
+  ToolContract,
   WorkspaceRole,
 } from '@element-plus/contracts'
 
@@ -179,6 +186,7 @@ export interface ProblemSpecificationRepository {
     constraints: string[]
     provenance: Provenance
   }): Promise<ProblemSpecificationRecord>
+  findById(id: string): Promise<ProblemSpecificationRecord | null>
   findByProblemAndVersion(
     problemId: string,
     version: string,
@@ -249,4 +257,168 @@ export interface IslandRepository {
   list(): Promise<Island[]>
   listActive(): Promise<Island[]>
   updateStatus(id: string, status: IslandStatus): Promise<void>
+}
+
+// ---------------------------------------------------------------------------
+// Run engine (Sprint 05)
+// ---------------------------------------------------------------------------
+
+export interface RunRecord {
+  id: string
+  status: RunStatus
+  snapshot: RunSnapshot
+  provenance: Provenance
+  createdAt: string
+  updatedAt: string
+}
+
+export interface RunEventRecord {
+  id: string
+  runId: string
+  seq: number
+  type: RunEventType
+  at: string
+  payload: Record<string, unknown>
+}
+
+export type ToolCallStatus = 'requested' | 'approved' | 'rejected' | 'denied' | 'executed'
+
+export interface ToolCallRecord {
+  id: string
+  runId: string
+  toolId: string
+  toolName: string
+  arguments: Record<string, unknown>
+  effectKind: EffectKind
+  requiresApproval: boolean
+  status: ToolCallStatus
+  createdAt: string
+}
+
+export interface ApprovalRecord {
+  id: string
+  runId: string
+  toolCallId: string
+  effectKind: EffectKind
+  status: 'pending' | 'approved' | 'rejected'
+  requestedAt: string
+  decidedAt: string | null
+  decidedBy: string | null
+}
+
+export interface EffectRecordRow {
+  id: string
+  runId: string
+  toolCallId: string
+  kind: EffectKind
+  description: string
+  occurredAt: string
+  reverted: boolean
+}
+
+export interface ArtifactRecord {
+  id: string
+  runId: string
+  kind: ArtifactKind
+  mimeType: string
+  sizeBytes: number | null
+  data: unknown
+  provenance: Provenance
+  createdAt: string
+}
+
+export interface RunRepository {
+  create(input: RunRecord): Promise<RunRecord>
+  findById(id: string): Promise<RunRecord | null>
+  updateStatus(id: string, status: RunStatus): Promise<RunRecord>
+  appendEvent(input: {
+    runId: string
+    type: RunEventType
+    payload?: Record<string, unknown>
+  }): Promise<RunEventRecord>
+  listEvents(runId: string): Promise<RunEventRecord[]>
+  list(): Promise<RunRecord[]>
+}
+
+export interface ApprovalRepository {
+  create(input: Omit<ApprovalRecord, 'requestedAt'>): Promise<ApprovalRecord>
+  findById(id: string): Promise<ApprovalRecord | null>
+  listByRun(runId: string): Promise<ApprovalRecord[]>
+  decide(id: string, status: 'approved' | 'rejected', decidedBy: string): Promise<ApprovalRecord>
+}
+
+export interface ToolCallRepository {
+  create(input: Omit<ToolCallRecord, 'createdAt'>): Promise<ToolCallRecord>
+  findById(id: string): Promise<ToolCallRecord | null>
+  listByRun(runId: string): Promise<ToolCallRecord[]>
+  updateStatus(id: string, status: ToolCallStatus): Promise<void>
+}
+
+export interface EffectRepository {
+  create(input: Omit<EffectRecordRow, 'occurredAt'>): Promise<EffectRecordRow>
+  listByRun(runId: string): Promise<EffectRecordRow[]>
+}
+
+export interface ArtifactRepository {
+  create(input: Omit<ArtifactRecord, 'createdAt'>): Promise<ArtifactRecord>
+  listByRun(runId: string): Promise<ArtifactRecord[]>
+}
+
+export interface EvaluationRepository {
+  create(input: Evaluation): Promise<Evaluation>
+  listByRun(runId: string): Promise<Evaluation[]>
+}
+
+/** Registry of ToolContracts, resolved by id at run time. */
+export interface ToolRegistry {
+  get(id: string): ToolContract | null
+  list(): ToolContract[]
+}
+
+export interface RuntimeError {
+  code: string
+  message: string
+}
+
+export type RuntimeEvent =
+  | { type: 'started' }
+  | { type: 'log'; message: string }
+  | { type: 'tool_result'; toolCallId: string; result: unknown }
+  | { type: 'completed'; result: unknown }
+  | { type: 'failed'; error: RuntimeError }
+
+export interface RuntimeSession {
+  runId: string
+  island: Island
+  process: Process | null
+  problemSpec: ProblemSpecificationRecord
+}
+
+export interface ToolGateRequest {
+  toolId: string
+  arguments: Record<string, unknown>
+}
+
+export interface ToolGateResult {
+  allowed: boolean
+  reason?: 'denied' | 'rejected' | 'cancelled'
+  toolCallId: string
+}
+
+/**
+ * The gate every runtime goes through before executing an effectful tool.
+ * Default deny: `allowed: false` means the tool must not execute.
+ */
+export interface ToolGate {
+  request(request: ToolGateRequest): Promise<ToolGateResult>
+}
+
+/**
+ * A RuntimeAdapter executes Element Plus contracts. OpenClaw (Sprint 06) is one
+ * adapter; the fake adapter (Sprint 05) is another. Adapters never redefine
+ * contracts.
+ */
+export interface RuntimeAdapter {
+  readonly kind: 'fake' | 'openclaw'
+  start(session: RuntimeSession): AsyncIterable<RuntimeEvent>
 }

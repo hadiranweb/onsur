@@ -1,14 +1,23 @@
 import type {
   Capability,
+  Evaluation,
   Island,
   ProblemItem,
   Process,
   Provenance,
+  RunEventType,
   SpsStatus,
   WorkspaceRole,
 } from '@element-plus/contracts'
 import type {
+  ApprovalRecord,
+  ApprovalRepository,
+  ArtifactRecord,
+  ArtifactRepository,
   CapabilityRepository,
+  EffectRecordRow,
+  EffectRepository,
+  EvaluationRepository,
   IslandRepository,
   MembershipRecord,
   MembershipRepository,
@@ -18,12 +27,18 @@ import type {
   ProblemSpecificationRecord,
   ProblemSpecificationRepository,
   ProcessRepository,
+  RunEventRecord,
+  RunRecord,
+  RunRepository,
   SessionCodec,
   SessionRecord,
   SessionRepository,
   SpsMessageRecord,
   SpsRepository,
   SpsSessionRecord,
+  ToolCallRecord,
+  ToolCallRepository,
+  ToolCallStatus,
   UserRecord,
   UserRepository,
   WorkspaceRecord,
@@ -300,6 +315,10 @@ export class InMemoryProblemSpecificationRepository implements ProblemSpecificat
     return null
   }
 
+  async findById(id: string): Promise<ProblemSpecificationRecord | null> {
+    return this.byId.get(id) ?? null
+  }
+
   async findLatestByProblem(problemId: string): Promise<ProblemSpecificationRecord | null> {
     const records = [...this.byId.values()].filter((record) => record.problemId === problemId)
     return maxByVersion(records)
@@ -497,5 +516,148 @@ export class InMemoryIslandRepository implements IslandRepository {
 
   all(): Island[] {
     return [...this.byKey.values()]
+  }
+}
+
+export class InMemoryRunRepository implements RunRepository {
+  private readonly byId = new Map<string, RunRecord>()
+  private readonly events = new Map<string, RunEventRecord[]>()
+
+  async create(input: RunRecord): Promise<RunRecord> {
+    this.byId.set(input.id, input)
+    return input
+  }
+
+  async findById(id: string): Promise<RunRecord | null> {
+    return this.byId.get(id) ?? null
+  }
+
+  async updateStatus(id: string, status: RunRecord['status']): Promise<RunRecord> {
+    const run = this.byId.get(id)
+    if (!run) throw new Error(`run ${id} not found`)
+    run.status = status
+    run.updatedAt = new Date().toISOString()
+    return run
+  }
+
+  async appendEvent(input: {
+    runId: string
+    type: RunEventType
+    payload?: Record<string, unknown>
+  }): Promise<RunEventRecord> {
+    const existing = this.events.get(input.runId) ?? []
+    const record: RunEventRecord = {
+      id: nextId('run-event'),
+      runId: input.runId,
+      seq: existing.length,
+      type: input.type,
+      at: new Date().toISOString(),
+      payload: input.payload ?? {},
+    }
+    this.events.set(input.runId, [...existing, record])
+    return record
+  }
+
+  async listEvents(runId: string): Promise<RunEventRecord[]> {
+    return this.events.get(runId) ?? []
+  }
+
+  async list(): Promise<RunRecord[]> {
+    return [...this.byId.values()]
+  }
+}
+
+export class InMemoryApprovalRepository implements ApprovalRepository {
+  private readonly byId = new Map<string, ApprovalRecord>()
+
+  async create(input: Omit<ApprovalRecord, 'requestedAt'>): Promise<ApprovalRecord> {
+    const record: ApprovalRecord = { ...input, requestedAt: new Date().toISOString() }
+    this.byId.set(record.id, record)
+    return record
+  }
+
+  async findById(id: string): Promise<ApprovalRecord | null> {
+    return this.byId.get(id) ?? null
+  }
+
+  async listByRun(runId: string): Promise<ApprovalRecord[]> {
+    return [...this.byId.values()].filter((approval) => approval.runId === runId)
+  }
+
+  async decide(
+    id: string,
+    status: 'approved' | 'rejected',
+    decidedBy: string,
+  ): Promise<ApprovalRecord> {
+    const record = this.byId.get(id)
+    if (!record) throw new Error(`approval ${id} not found`)
+    record.status = status
+    record.decidedAt = new Date().toISOString()
+    record.decidedBy = decidedBy
+    return record
+  }
+}
+
+export class InMemoryToolCallRepository implements ToolCallRepository {
+  private readonly byId = new Map<string, ToolCallRecord>()
+
+  async create(input: Omit<ToolCallRecord, 'createdAt'>): Promise<ToolCallRecord> {
+    const record: ToolCallRecord = { ...input, createdAt: new Date().toISOString() }
+    this.byId.set(record.id, record)
+    return record
+  }
+
+  async findById(id: string): Promise<ToolCallRecord | null> {
+    return this.byId.get(id) ?? null
+  }
+
+  async listByRun(runId: string): Promise<ToolCallRecord[]> {
+    return [...this.byId.values()].filter((toolCall) => toolCall.runId === runId)
+  }
+
+  async updateStatus(id: string, status: ToolCallStatus): Promise<void> {
+    const record = this.byId.get(id)
+    if (record) record.status = status
+  }
+}
+
+export class InMemoryEffectRepository implements EffectRepository {
+  private readonly byId = new Map<string, EffectRecordRow>()
+
+  async create(input: Omit<EffectRecordRow, 'occurredAt'>): Promise<EffectRecordRow> {
+    const record: EffectRecordRow = { ...input, occurredAt: new Date().toISOString() }
+    this.byId.set(record.id, record)
+    return record
+  }
+
+  async listByRun(runId: string): Promise<EffectRecordRow[]> {
+    return [...this.byId.values()].filter((effect) => effect.runId === runId)
+  }
+}
+
+export class InMemoryArtifactRepository implements ArtifactRepository {
+  private readonly byId = new Map<string, ArtifactRecord>()
+
+  async create(input: Omit<ArtifactRecord, 'createdAt'>): Promise<ArtifactRecord> {
+    const record: ArtifactRecord = { ...input, createdAt: new Date().toISOString() }
+    this.byId.set(record.id, record)
+    return record
+  }
+
+  async listByRun(runId: string): Promise<ArtifactRecord[]> {
+    return [...this.byId.values()].filter((artifact) => artifact.runId === runId)
+  }
+}
+
+export class InMemoryEvaluationRepository implements EvaluationRepository {
+  private readonly byId = new Map<string, Evaluation>()
+
+  async create(input: Evaluation): Promise<Evaluation> {
+    this.byId.set(input.id, input)
+    return input
+  }
+
+  async listByRun(runId: string): Promise<Evaluation[]> {
+    return [...this.byId.values()].filter((evaluation) => evaluation.runId.id === runId)
   }
 }

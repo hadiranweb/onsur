@@ -144,6 +144,9 @@ export type { Asset, AssetKind, AssetVisibility } from './asset'
 export { auditEventSchema, auditOutcomeSchema } from './audit'
 export type { AuditEvent, AuditOutcome } from './audit'
 
+export { approvalSchema, approvalStatusSchema } from './approval'
+export type { Approval, ApprovalStatus } from './approval'
+
 export {
   emailSchema,
   passwordSchema,

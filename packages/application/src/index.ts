@@ -29,6 +29,27 @@ export type {
   SpsRepository,
   StructuredLlmPort,
   StructuredLlmRequest,
+  RunRecord,
+  RunEventRecord,
+  ToolCallRecord,
+  ToolCallStatus,
+  ApprovalRecord,
+  EffectRecordRow,
+  ArtifactRecord,
+  RunRepository,
+  ApprovalRepository,
+  ToolCallRepository,
+  EffectRepository,
+  ArtifactRepository,
+  EvaluationRepository,
+  ToolRegistry,
+  RuntimeAdapter,
+  RuntimeEvent,
+  RuntimeError,
+  RuntimeSession,
+  ToolGate,
+  ToolGateRequest,
+  ToolGateResult,
 } from './ports'
 
 export { AuthService, SESSION_COOKIE_NAME, SESSION_TTL_MS } from './services/auth-service'
@@ -53,6 +74,17 @@ export type {
   ResolveOrCreateResult,
 } from './services/island-service'
 
+export { RunEngine, normalizeError } from './services/run-engine'
+export type { EnqueueRunInput, RunEngineDeps, RunView } from './services/run-engine'
+
+export { FakeRuntimeAdapter } from './infrastructure/fake-runtime-adapter'
+export type {
+  FakeRuntimeAdapterOptions,
+  FakeRuntimeScriptStep,
+} from './infrastructure/fake-runtime-adapter'
+
+export { InMemoryToolRegistry, DEFAULT_TOOL_CONTRACTS } from './infrastructure/tool-registry'
+
 export {
   STRUCTURED_ANALYSIS_CAPABILITY,
   structuredAnalysisIslandManifest,
@@ -74,6 +106,12 @@ export { PostgresSpsRepository } from './infrastructure/postgres-repositories'
 export { PostgresCapabilityRepository } from './infrastructure/postgres-repositories'
 export { PostgresProcessRepository } from './infrastructure/postgres-repositories'
 export { PostgresIslandRepository } from './infrastructure/postgres-repositories'
+export { PostgresRunRepository } from './infrastructure/postgres-repositories'
+export { PostgresApprovalRepository } from './infrastructure/postgres-repositories'
+export { PostgresToolCallRepository } from './infrastructure/postgres-repositories'
+export { PostgresEffectRepository } from './infrastructure/postgres-repositories'
+export { PostgresArtifactRepository } from './infrastructure/postgres-repositories'
+export { PostgresEvaluationRepository } from './infrastructure/postgres-repositories'
 export { ScryptPasswordHasher } from './infrastructure/scrypt-password-hasher'
 export { HmacSessionCodec } from './infrastructure/session-codec'
 export { readMigrations, runMigrations } from './infrastructure/migrate'

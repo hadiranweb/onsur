@@ -32,6 +32,7 @@ export const runEventTypeSchema = z.enum([
   'complete',
   'fail',
   'cancel',
+  'log',
 ])
 
 export type RunEventType = z.infer<typeof runEventTypeSchema>
