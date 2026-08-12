@@ -13,8 +13,9 @@ versioned knowledge.
 
 - Sprint 00 (clean repository foundation): **done**
 - Sprint 01 (canonical contracts + domain core): **done**
-- Sprint 02 (PostgreSQL + identity + workspace): **in progress**
-- Sprint 03+ (Founder, capability/process/island, run engine, OpenClaw,
+- Sprint 02 (PostgreSQL + identity + workspace): **done**
+- Sprint 03 (Founder + structured problem solving): **in progress**
+- Sprint 04+ (capability/process/island, run engine, OpenClaw,
   evidence/memory/knowledge, packages, marketplace, hardening): planned — see
   the sprint roadmap below.
 
@@ -125,8 +126,8 @@ environment validation and database connectivity honestly
 | ------ | ------------------------------------------ | ------- |
 | 00     | Clean foundation                           | done    |
 | 01     | Canonical contracts + domain core          | done    |
-| 02     | PostgreSQL + identity + workspace          | current |
-| 03     | Founder + structured problem solving       | planned |
+| 02     | PostgreSQL + identity + workspace          | done    |
+| 03     | Founder + structured problem solving       | current |
 | 04     | Capability + process + island              | planned |
 | 05     | Run engine + fake runtime                  | planned |
 | 06     | OpenClaw adapter                           | planned |

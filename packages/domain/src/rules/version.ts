@@ -56,3 +56,9 @@ export function canPublishVersion(
 ): boolean {
   return existingVersions.every((existing) => compareVersions(newVersion, existing) > 0)
 }
+
+/** Return the next patch version (e.g. 1.2.3 → 1.2.4). */
+export function bumpPatch(version: string): string {
+  const [major, minor, patch] = parseVersion(version)
+  return `${major}.${minor}.${patch + 1}`
+}

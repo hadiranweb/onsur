@@ -1,4 +1,10 @@
-import type { WorkspaceRole } from '@element-plus/contracts'
+import type {
+  ProblemItem,
+  Provenance,
+  SpsStatus,
+  StructuredProblemOutput,
+  WorkspaceRole,
+} from '@element-plus/contracts'
 
 /**
  * Persistence and infrastructure ports. The application layer depends on these
@@ -101,4 +107,110 @@ export interface PasswordHasher {
 export interface SessionCodec {
   create(): { cookieValue: string; tokenHash: string }
   parse(cookieValue: string | null | undefined): string | null
+}
+
+// ---------------------------------------------------------------------------
+// Problem / SPS persistence (Sprint 03)
+// ---------------------------------------------------------------------------
+
+export interface ProblemRecord {
+  id: string
+  workspaceId: string
+  rawProblem: string
+  createdAt: string
+  updatedAt: string
+}
+
+export interface ProblemSpecificationRecord {
+  id: string
+  problemId: string
+  workspaceId: string
+  version: string
+  status: 'draft' | 'confirmed' | 'superseded'
+  rawProblem: string
+  structuredUnderstanding: string
+  items: ProblemItem[]
+  successCriteria: string[]
+  constraints: string[]
+  provenance: Provenance
+  createdAt: string
+}
+
+export interface SpsSessionRecord {
+  id: string
+  workspaceId: string
+  problemId: string
+  status: SpsStatus
+  createdAt: string
+  updatedAt: string
+}
+
+export interface SpsMessageRecord {
+  id: string
+  sessionId: string
+  role: 'user' | 'assistant' | 'system'
+  content: string
+  seq: number
+  createdAt: string
+}
+
+export interface ProblemRepository {
+  create(input: { id: string; workspaceId: string; rawProblem: string }): Promise<ProblemRecord>
+  findById(id: string): Promise<ProblemRecord | null>
+  listByWorkspace(workspaceId: string): Promise<ProblemRecord[]>
+}
+
+export interface ProblemSpecificationRepository {
+  create(input: {
+    id: string
+    problemId: string
+    workspaceId: string
+    version: string
+    status: 'draft' | 'confirmed' | 'superseded'
+    rawProblem: string
+    structuredUnderstanding: string
+    items: ProblemItem[]
+    successCriteria: string[]
+    constraints: string[]
+    provenance: Provenance
+  }): Promise<ProblemSpecificationRecord>
+  findByProblemAndVersion(
+    problemId: string,
+    version: string,
+  ): Promise<ProblemSpecificationRecord | null>
+  findLatestByProblem(problemId: string): Promise<ProblemSpecificationRecord | null>
+  findConfirmedByProblem(problemId: string): Promise<ProblemSpecificationRecord | null>
+  updateStatus(id: string, status: 'draft' | 'confirmed' | 'superseded'): Promise<void>
+}
+
+export interface SpsRepository {
+  createSession(input: {
+    id: string
+    workspaceId: string
+    problemId: string
+  }): Promise<SpsSessionRecord>
+  findSessionById(id: string): Promise<SpsSessionRecord | null>
+  updateStatus(id: string, status: SpsStatus): Promise<SpsSessionRecord>
+  addMessage(input: {
+    id: string
+    sessionId: string
+    role: 'user' | 'assistant' | 'system'
+    content: string
+  }): Promise<SpsMessageRecord>
+  listMessages(sessionId: string): Promise<SpsMessageRecord[]>
+  listSessionsByWorkspace(workspaceId: string): Promise<SpsSessionRecord[]>
+}
+
+/**
+ * The structured LLM port. Any provider (a deterministic fake in tests/dev, or
+ * a real model later) implements this interface; its output is untrusted until
+ * the Founder service validates it against `structuredProblemOutputSchema`.
+ */
+export interface StructuredLlmPort {
+  structure(input: StructuredLlmRequest): Promise<StructuredProblemOutput>
+}
+
+export interface StructuredLlmRequest {
+  rawProblem: string
+  corrections: string[]
 }

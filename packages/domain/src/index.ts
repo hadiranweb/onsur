@@ -18,6 +18,7 @@ export {
   isVersionGreater,
   assertNewVersion,
   canPublishVersion,
+  bumpPatch,
 } from './rules/version'
 export type { SemverTriple } from './rules/version'
 
@@ -77,3 +78,5 @@ export type { MembershipLike } from './rules/workspace'
 
 export { isSessionActive, validatePassword } from './rules/identity'
 export type { SessionLike } from './rules/identity'
+
+export { spsTransitions, canSpsTransition, nextSpsState } from './rules/sps'

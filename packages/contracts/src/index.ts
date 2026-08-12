@@ -18,6 +18,23 @@ export {
 } from './problem'
 export type { ProblemSpecification, ProblemItem, ProblemStatus, EvidenceKind } from './problem'
 
+export {
+  spsStatusSchema,
+  spsEventSchema,
+  spsMessageRoleSchema,
+  spsMessageSchema,
+  spsSessionSchema,
+  structuredProblemOutputSchema,
+} from './sps'
+export type {
+  SpsStatus,
+  SpsEvent,
+  SpsMessageRole,
+  SpsMessage,
+  SpsSession,
+  StructuredProblemOutput,
+} from './sps'
+
 export { evidenceSchema, evidenceStatusSchema, evidenceEventSchema } from './evidence'
 export type { Evidence, EvidenceStatus, EvidenceEvent } from './evidence'
 

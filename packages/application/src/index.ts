@@ -20,6 +20,15 @@ export type {
   MembershipRepository,
   PasswordHasher,
   SessionCodec,
+  ProblemRecord,
+  ProblemSpecificationRecord,
+  SpsSessionRecord,
+  SpsMessageRecord,
+  ProblemRepository,
+  ProblemSpecificationRepository,
+  SpsRepository,
+  StructuredLlmPort,
+  StructuredLlmRequest,
 } from './ports'
 
 export { AuthService, SESSION_COOKIE_NAME, SESSION_TTL_MS } from './services/auth-service'
@@ -28,12 +37,20 @@ export type { AuthServiceDeps, AuthResult } from './services/auth-service'
 export { WorkspaceService } from './services/workspace-service'
 export type { WorkspaceAccess, WorkspaceServiceDeps } from './services/workspace-service'
 
+export { FounderService } from './services/founder-service'
+export type { FounderServiceDeps, FounderSessionView } from './services/founder-service'
+
+export { FakeStructuredLlm, MalformedStructuredLlm } from './infrastructure/fake-structured-llm'
+
 export { createPgPool } from './infrastructure/pg'
 export { createPostgresRepositories } from './infrastructure/postgres-repositories'
 export { PostgresUserRepository } from './infrastructure/postgres-repositories'
 export { PostgresSessionRepository } from './infrastructure/postgres-repositories'
 export { PostgresWorkspaceRepository } from './infrastructure/postgres-repositories'
 export { PostgresMembershipRepository } from './infrastructure/postgres-repositories'
+export { PostgresProblemRepository } from './infrastructure/postgres-repositories'
+export { PostgresProblemSpecificationRepository } from './infrastructure/postgres-repositories'
+export { PostgresSpsRepository } from './infrastructure/postgres-repositories'
 export { ScryptPasswordHasher } from './infrastructure/scrypt-password-hasher'
 export { HmacSessionCodec } from './infrastructure/session-codec'
 export { readMigrations, runMigrations } from './infrastructure/migrate'

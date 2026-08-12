@@ -132,4 +132,60 @@ describe('postgres persistence (integration)', () => {
     await app.auth.logout(registered.cookieValue)
     expect(await app.auth.getUserForCookie(registered.cookieValue)).toBeNull()
   })
+
+  it('runs the full Founder flow through real persistence', async () => {
+    const registered = await app.auth.register({
+      email: uniqueEmail(),
+      password: 'password123',
+      displayName: 'Founder IT',
+    })
+    const personal = await app.workspaces.getPersonalWorkspace(registered.user.id)
+    expect(personal).not.toBeNull()
+
+    const raw = 'Deployments fail intermittently when the database migration runs.'
+    const started = await app.founder.start(registered.user, personal!.id, raw)
+
+    expect(started.session.status).toBe('review')
+    expect(started.draft).not.toBeNull()
+    expect(started.draft!.version).toBe('1.0.0')
+    expect(started.problem.rawProblem).toBe(raw)
+
+    const corrected = await app.founder.correct(
+      registered.user,
+      personal!.id,
+      started.session.id,
+      'Failures correlate with concurrent deploys.',
+    )
+    expect(corrected.draft!.version).toBe('1.0.1')
+
+    const confirmed = await app.founder.confirm(registered.user, personal!.id, started.session.id)
+    expect(confirmed.session.status).toBe('confirmed')
+    expect(confirmed.confirmed!.version).toBe('1.0.1')
+    expect(confirmed.confirmed!.status).toBe('confirmed')
+    expect(confirmed.confirmed!.rawProblem).toBe(raw)
+  })
+
+  it('enforces Founder cross-workspace isolation through real persistence', async () => {
+    const alice = await app.auth.register({
+      email: uniqueEmail(),
+      password: 'password123',
+      displayName: 'Alice F',
+    })
+    const bob = await app.auth.register({
+      email: uniqueEmail(),
+      password: 'password123',
+      displayName: 'Bob F',
+    })
+    const alicePersonal = await app.workspaces.getPersonalWorkspace(alice.user.id)
+    const bobPersonal = await app.workspaces.getPersonalWorkspace(bob.user.id)
+
+    const session = await app.founder.start(alice.user, alicePersonal!.id, 'Alice problem.')
+
+    await expect(
+      app.founder.get(bob.user, bobPersonal!.id, session.session.id),
+    ).rejects.toMatchObject({ code: 'NOT_FOUND' })
+    await expect(
+      app.founder.confirm(bob.user, alicePersonal!.id, session.session.id),
+    ).rejects.toMatchObject({ code: 'FORBIDDEN' })
+  })
 })

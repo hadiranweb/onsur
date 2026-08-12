@@ -99,3 +99,53 @@ a {
 .app-home ul {
   padding-left: 1.25rem;
 }
+
+.founder__fa {
+  opacity: 0.8;
+}
+
+.founder__error {
+  color: #c0392b;
+}
+
+.founder__form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  max-width: 36rem;
+  margin-bottom: 1.5rem;
+}
+
+.founder__form label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.founder__form textarea,
+.founder__form input {
+  padding: 0.5rem;
+}
+
+.founder__form button {
+  padding: 0.5rem;
+  cursor: pointer;
+  align-self: flex-start;
+}
+
+.founder__actions {
+  display: flex;
+  gap: 2rem;
+  margin: 1rem 0;
+}
+
+.founder__raw,
+.founder__draft,
+.founder__confirmed,
+.founder__messages {
+  margin-bottom: 1.5rem;
+}
+
+.founder__messages ol {
+  padding-left: 1.25rem;
+}

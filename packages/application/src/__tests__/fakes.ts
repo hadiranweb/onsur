@@ -1,16 +1,24 @@
-import type { WorkspaceRole } from '@element-plus/contracts'
+import type { ProblemItem, Provenance, SpsStatus, WorkspaceRole } from '@element-plus/contracts'
 import type {
   MembershipRecord,
   MembershipRepository,
   PasswordHasher,
+  ProblemRecord,
+  ProblemRepository,
+  ProblemSpecificationRecord,
+  ProblemSpecificationRepository,
   SessionCodec,
   SessionRecord,
   SessionRepository,
+  SpsMessageRecord,
+  SpsRepository,
+  SpsSessionRecord,
   UserRecord,
   UserRepository,
   WorkspaceRecord,
   WorkspaceRepository,
 } from '../ports'
+import { compareVersions } from '@element-plus/domain'
 import { UniqueViolationError } from '../errors'
 
 let seq = 0
@@ -216,4 +224,162 @@ export class FakeSessionCodec implements SessionCodec {
     }
     return `hash(${match[1]})`
   }
+}
+
+export class InMemoryProblemRepository implements ProblemRepository {
+  private readonly byId = new Map<string, ProblemRecord>()
+
+  async create(input: {
+    id: string
+    workspaceId: string
+    rawProblem: string
+  }): Promise<ProblemRecord> {
+    const now = new Date().toISOString()
+    const record: ProblemRecord = {
+      id: input.id,
+      workspaceId: input.workspaceId,
+      rawProblem: input.rawProblem,
+      createdAt: now,
+      updatedAt: now,
+    }
+    this.byId.set(record.id, record)
+    return record
+  }
+
+  async findById(id: string): Promise<ProblemRecord | null> {
+    return this.byId.get(id) ?? null
+  }
+
+  async listByWorkspace(workspaceId: string): Promise<ProblemRecord[]> {
+    return [...this.byId.values()].filter((record) => record.workspaceId === workspaceId)
+  }
+}
+
+export class InMemoryProblemSpecificationRepository implements ProblemSpecificationRepository {
+  private readonly byId = new Map<string, ProblemSpecificationRecord>()
+
+  async create(input: {
+    id: string
+    problemId: string
+    workspaceId: string
+    version: string
+    status: 'draft' | 'confirmed' | 'superseded'
+    rawProblem: string
+    structuredUnderstanding: string
+    items: ProblemItem[]
+    successCriteria: string[]
+    constraints: string[]
+    provenance: Provenance
+  }): Promise<ProblemSpecificationRecord> {
+    const record: ProblemSpecificationRecord = {
+      ...input,
+      createdAt: new Date().toISOString(),
+    }
+    this.byId.set(record.id, record)
+    return record
+  }
+
+  async findByProblemAndVersion(
+    problemId: string,
+    version: string,
+  ): Promise<ProblemSpecificationRecord | null> {
+    for (const record of this.byId.values()) {
+      if (record.problemId === problemId && record.version === version) return record
+    }
+    return null
+  }
+
+  async findLatestByProblem(problemId: string): Promise<ProblemSpecificationRecord | null> {
+    const records = [...this.byId.values()].filter((record) => record.problemId === problemId)
+    return maxByVersion(records)
+  }
+
+  async findConfirmedByProblem(problemId: string): Promise<ProblemSpecificationRecord | null> {
+    const records = [...this.byId.values()].filter(
+      (record) => record.problemId === problemId && record.status === 'confirmed',
+    )
+    return maxByVersion(records)
+  }
+
+  async updateStatus(id: string, status: 'draft' | 'confirmed' | 'superseded'): Promise<void> {
+    const record = this.byId.get(id)
+    if (record) {
+      record.status = status
+    }
+  }
+
+  all(): ProblemSpecificationRecord[] {
+    return [...this.byId.values()]
+  }
+}
+
+export class InMemorySpsRepository implements SpsRepository {
+  private readonly sessions = new Map<string, SpsSessionRecord>()
+  private readonly messages = new Map<string, SpsMessageRecord[]>()
+
+  async createSession(input: {
+    id: string
+    workspaceId: string
+    problemId: string
+  }): Promise<SpsSessionRecord> {
+    const now = new Date().toISOString()
+    const record: SpsSessionRecord = {
+      id: input.id,
+      workspaceId: input.workspaceId,
+      problemId: input.problemId,
+      status: 'open',
+      createdAt: now,
+      updatedAt: now,
+    }
+    this.sessions.set(record.id, record)
+    return record
+  }
+
+  async findSessionById(id: string): Promise<SpsSessionRecord | null> {
+    return this.sessions.get(id) ?? null
+  }
+
+  async updateStatus(id: string, status: SpsStatus): Promise<SpsSessionRecord> {
+    const record = this.sessions.get(id)
+    if (!record) {
+      throw new Error(`session ${id} not found`)
+    }
+    record.status = status
+    record.updatedAt = new Date().toISOString()
+    return record
+  }
+
+  async addMessage(input: {
+    id: string
+    sessionId: string
+    role: 'user' | 'assistant' | 'system'
+    content: string
+  }): Promise<SpsMessageRecord> {
+    const existing = this.messages.get(input.sessionId) ?? []
+    const record: SpsMessageRecord = {
+      id: input.id,
+      sessionId: input.sessionId,
+      role: input.role,
+      content: input.content,
+      seq: existing.length,
+      createdAt: new Date().toISOString(),
+    }
+    this.messages.set(input.sessionId, [...existing, record])
+    return record
+  }
+
+  async listMessages(sessionId: string): Promise<SpsMessageRecord[]> {
+    return this.messages.get(sessionId) ?? []
+  }
+
+  async listSessionsByWorkspace(workspaceId: string): Promise<SpsSessionRecord[]> {
+    return [...this.sessions.values()].filter((record) => record.workspaceId === workspaceId)
+  }
+}
+
+function maxByVersion(records: ProblemSpecificationRecord[]): ProblemSpecificationRecord | null {
+  if (records.length === 0) return null
+  return records.reduce((max, record) =>
+    compareVersions(record.version, max.version) > 0 ? record : max,
+  )
 }

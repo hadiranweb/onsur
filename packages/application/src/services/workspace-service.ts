@@ -74,6 +74,11 @@ export class WorkspaceService {
     return result
   }
 
+  /** The user's personal workspace, or null. */
+  async getPersonalWorkspace(userId: string): Promise<WorkspaceRecord | null> {
+    return this.deps.workspaces.findPersonalByOwner(userId)
+  }
+
   /** Returns the workspace + membership role, or null when not a member. */
   async getForUser(userId: string, workspaceId: string): Promise<WorkspaceAccess | null> {
     const membership = await this.deps.memberships.findByWorkspaceAndUser(workspaceId, userId)

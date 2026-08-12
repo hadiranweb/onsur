@@ -1,11 +1,19 @@
 import type { Pool } from 'pg'
-import type { WorkspaceRole } from '@element-plus/contracts'
+import type { ProblemItem, Provenance, SpsStatus, WorkspaceRole } from '@element-plus/contracts'
+import { compareVersions } from '@element-plus/domain'
 import { UniqueViolationError } from '../errors'
 import type {
   MembershipRecord,
   MembershipRepository,
+  ProblemRecord,
+  ProblemRepository,
+  ProblemSpecificationRecord,
+  ProblemSpecificationRepository,
   SessionRecord,
   SessionRepository,
+  SpsMessageRecord,
+  SpsRepository,
+  SpsSessionRecord,
   UserRecord,
   UserRepository,
   WorkspaceRecord,
@@ -250,11 +258,246 @@ export class PostgresMembershipRepository implements MembershipRepository {
   }
 }
 
+function mapProblem(row: Record<string, unknown>): ProblemRecord {
+  return {
+    id: row.id as string,
+    workspaceId: row.workspace_id as string,
+    rawProblem: row.raw_problem as string,
+    createdAt: toIso(row.created_at),
+    updatedAt: toIso(row.updated_at),
+  }
+}
+
+function mapSpecification(row: Record<string, unknown>): ProblemSpecificationRecord {
+  return {
+    id: row.id as string,
+    problemId: row.problem_id as string,
+    workspaceId: row.workspace_id as string,
+    version: row.version as string,
+    status: row.status as 'draft' | 'confirmed' | 'superseded',
+    rawProblem: row.raw_problem as string,
+    structuredUnderstanding: row.structured_understanding as string,
+    items: row.items as ProblemItem[],
+    successCriteria: row.success_criteria as string[],
+    constraints: row.constraints as string[],
+    provenance: row.provenance as Provenance,
+    createdAt: toIso(row.created_at),
+  }
+}
+
+function mapSpsSession(row: Record<string, unknown>): SpsSessionRecord {
+  return {
+    id: row.id as string,
+    workspaceId: row.workspace_id as string,
+    problemId: row.problem_id as string,
+    status: row.status as SpsStatus,
+    createdAt: toIso(row.created_at),
+    updatedAt: toIso(row.updated_at),
+  }
+}
+
+function mapSpsMessage(row: Record<string, unknown>): SpsMessageRecord {
+  return {
+    id: row.id as string,
+    sessionId: row.session_id as string,
+    role: row.role as 'user' | 'assistant' | 'system',
+    content: row.content as string,
+    seq: Number(row.seq),
+    createdAt: toIso(row.created_at),
+  }
+}
+
+export class PostgresProblemRepository implements ProblemRepository {
+  constructor(private readonly pool: Pool) {}
+
+  async create(input: {
+    id: string
+    workspaceId: string
+    rawProblem: string
+  }): Promise<ProblemRecord> {
+    const result = await this.pool.query(
+      `INSERT INTO problems (id, workspace_id, raw_problem)
+       VALUES ($1, $2, $3)
+       RETURNING id, workspace_id, raw_problem, created_at, updated_at`,
+      [input.id, input.workspaceId, input.rawProblem],
+    )
+    return mapProblem(result.rows[0])
+  }
+
+  async findById(id: string): Promise<ProblemRecord | null> {
+    const result = await this.pool.query(
+      `SELECT id, workspace_id, raw_problem, created_at, updated_at
+         FROM problems WHERE id = $1`,
+      [id],
+    )
+    return result.rows[0] ? mapProblem(result.rows[0]) : null
+  }
+
+  async listByWorkspace(workspaceId: string): Promise<ProblemRecord[]> {
+    const result = await this.pool.query(
+      `SELECT id, workspace_id, raw_problem, created_at, updated_at
+         FROM problems WHERE workspace_id = $1 ORDER BY created_at DESC`,
+      [workspaceId],
+    )
+    return result.rows.map(mapProblem)
+  }
+}
+
+export class PostgresProblemSpecificationRepository implements ProblemSpecificationRepository {
+  constructor(private readonly pool: Pool) {}
+
+  async create(input: {
+    id: string
+    problemId: string
+    workspaceId: string
+    version: string
+    status: 'draft' | 'confirmed' | 'superseded'
+    rawProblem: string
+    structuredUnderstanding: string
+    items: ProblemItem[]
+    successCriteria: string[]
+    constraints: string[]
+    provenance: Provenance
+  }): Promise<ProblemSpecificationRecord> {
+    const result = await this.pool.query(
+      `INSERT INTO problem_specifications
+         (id, problem_id, workspace_id, version, status, raw_problem,
+          structured_understanding, items, success_criteria, constraints, provenance)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+       RETURNING id, problem_id, workspace_id, version, status, raw_problem,
+                 structured_understanding, items, success_criteria, constraints,
+                 provenance, created_at`,
+      [
+        input.id,
+        input.problemId,
+        input.workspaceId,
+        input.version,
+        input.status,
+        input.rawProblem,
+        input.structuredUnderstanding,
+        JSON.stringify(input.items),
+        JSON.stringify(input.successCriteria),
+        JSON.stringify(input.constraints),
+        JSON.stringify(input.provenance),
+      ],
+    )
+    return mapSpecification(result.rows[0])
+  }
+
+  async findByProblemAndVersion(
+    problemId: string,
+    version: string,
+  ): Promise<ProblemSpecificationRecord | null> {
+    const result = await this.pool.query(
+      `SELECT * FROM problem_specifications WHERE problem_id = $1 AND version = $2`,
+      [problemId, version],
+    )
+    return result.rows[0] ? mapSpecification(result.rows[0]) : null
+  }
+
+  async findLatestByProblem(problemId: string): Promise<ProblemSpecificationRecord | null> {
+    const result = await this.pool.query(
+      `SELECT * FROM problem_specifications WHERE problem_id = $1`,
+      [problemId],
+    )
+    return maxVersion(result.rows.map(mapSpecification))
+  }
+
+  async findConfirmedByProblem(problemId: string): Promise<ProblemSpecificationRecord | null> {
+    const result = await this.pool.query(
+      `SELECT * FROM problem_specifications
+         WHERE problem_id = $1 AND status = 'confirmed'`,
+      [problemId],
+    )
+    return maxVersion(result.rows.map(mapSpecification))
+  }
+
+  async updateStatus(id: string, status: 'draft' | 'confirmed' | 'superseded'): Promise<void> {
+    await this.pool.query(`UPDATE problem_specifications SET status = $2 WHERE id = $1`, [
+      id,
+      status,
+    ])
+  }
+}
+
+export class PostgresSpsRepository implements SpsRepository {
+  constructor(private readonly pool: Pool) {}
+
+  async createSession(input: {
+    id: string
+    workspaceId: string
+    problemId: string
+  }): Promise<SpsSessionRecord> {
+    const result = await this.pool.query(
+      `INSERT INTO sps_sessions (id, workspace_id, problem_id)
+       VALUES ($1, $2, $3)
+       RETURNING id, workspace_id, problem_id, status, created_at, updated_at`,
+      [input.id, input.workspaceId, input.problemId],
+    )
+    return mapSpsSession(result.rows[0])
+  }
+
+  async findSessionById(id: string): Promise<SpsSessionRecord | null> {
+    const result = await this.pool.query(
+      `SELECT id, workspace_id, problem_id, status, created_at, updated_at
+         FROM sps_sessions WHERE id = $1`,
+      [id],
+    )
+    return result.rows[0] ? mapSpsSession(result.rows[0]) : null
+  }
+
+  async updateStatus(id: string, status: SpsStatus): Promise<SpsSessionRecord> {
+    const result = await this.pool.query(
+      `UPDATE sps_sessions SET status = $2, updated_at = now() WHERE id = $1
+       RETURNING id, workspace_id, problem_id, status, created_at, updated_at`,
+      [id, status],
+    )
+    return mapSpsSession(result.rows[0])
+  }
+
+  async addMessage(input: {
+    id: string
+    sessionId: string
+    role: 'user' | 'assistant' | 'system'
+    content: string
+  }): Promise<SpsMessageRecord> {
+    const result = await this.pool.query(
+      `INSERT INTO sps_messages (id, session_id, role, content, seq)
+       VALUES ($1, $2, $3, $4,
+         (SELECT COALESCE(MAX(seq), 0) + 1 FROM sps_messages WHERE session_id = $2))
+       RETURNING id, session_id, role, content, seq, created_at`,
+      [input.id, input.sessionId, input.role, input.content],
+    )
+    return mapSpsMessage(result.rows[0])
+  }
+
+  async listMessages(sessionId: string): Promise<SpsMessageRecord[]> {
+    const result = await this.pool.query(
+      `SELECT id, session_id, role, content, seq, created_at
+         FROM sps_messages WHERE session_id = $1 ORDER BY seq ASC`,
+      [sessionId],
+    )
+    return result.rows.map(mapSpsMessage)
+  }
+
+  async listSessionsByWorkspace(workspaceId: string): Promise<SpsSessionRecord[]> {
+    const result = await this.pool.query(
+      `SELECT id, workspace_id, problem_id, status, created_at, updated_at
+         FROM sps_sessions WHERE workspace_id = $1 ORDER BY created_at DESC`,
+      [workspaceId],
+    )
+    return result.rows.map(mapSpsSession)
+  }
+}
+
 export interface PostgresRepositories {
   users: UserRepository
   sessions: SessionRepository
   workspaces: WorkspaceRepository
   memberships: MembershipRepository
+  problems: ProblemRepository
+  specifications: ProblemSpecificationRepository
+  sps: SpsRepository
 }
 
 export function createPostgresRepositories(pool: Pool): PostgresRepositories {
@@ -263,7 +506,20 @@ export function createPostgresRepositories(pool: Pool): PostgresRepositories {
     sessions: new PostgresSessionRepository(pool),
     workspaces: new PostgresWorkspaceRepository(pool),
     memberships: new PostgresMembershipRepository(pool),
+    problems: new PostgresProblemRepository(pool),
+    specifications: new PostgresProblemSpecificationRepository(pool),
+    sps: new PostgresSpsRepository(pool),
   }
+}
+
+/** Pick the highest-version record (semver), independent of insert timing. */
+function maxVersion(records: ProblemSpecificationRecord[]): ProblemSpecificationRecord | null {
+  if (records.length === 0) {
+    return null
+  }
+  return records.reduce((max, record) =>
+    compareVersions(record.version, max.version) > 0 ? record : max,
+  )
 }
 
 function isUniqueViolation(error: unknown): boolean {

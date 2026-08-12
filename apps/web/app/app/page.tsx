@@ -1,3 +1,4 @@
+import Link from 'next/link'
 import { requireUser } from '@/lib/server/auth'
 import { getApp } from '@/lib/server/services'
 
@@ -10,6 +11,9 @@ export default async function AppHome() {
   return (
     <main className="app-home">
       <h1>Welcome, {user.displayName}</h1>
+      <p>
+        <Link href="/app/founder">Open Founder →</Link>
+      </p>
       <h2>Your workspaces</h2>
       {accesses.length === 0 ? (
         <p>You have no workspaces.</p>

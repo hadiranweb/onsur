@@ -10,6 +10,7 @@ export type AppErrorCode =
   | 'FORBIDDEN'
   | 'NOT_FOUND'
   | 'CONFLICT'
+  | 'MODEL_OUTPUT_INVALID'
 
 const STATUS: Record<AppErrorCode, number> = {
   INVALID_INPUT: 400,
@@ -19,6 +20,7 @@ const STATUS: Record<AppErrorCode, number> = {
   FORBIDDEN: 403,
   NOT_FOUND: 404,
   CONFLICT: 409,
+  MODEL_OUTPUT_INVALID: 502,
 }
 
 export class AppError extends Error {

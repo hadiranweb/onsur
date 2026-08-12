@@ -10,9 +10,11 @@ const nextConfig = {
     '@element-plus/contracts',
     '@element-plus/application',
   ],
-  // `pg` is a native-ish CommonJS dependency; keep it external to the server
-  // bundle so it resolves from node_modules at runtime.
-  serverExternalPackages: ['pg'],
+  // Keep `pg` external to the server bundle so it resolves from node_modules
+  // at runtime (Next 14 experimental key).
+  experimental: {
+    serverComponentsExternalPackages: ['pg'],
+  },
 }
 
 export default nextConfig
