@@ -7,8 +7,11 @@ import { ScryptPasswordHasher } from './infrastructure/scrypt-password-hasher'
 import { HmacSessionCodec } from './infrastructure/session-codec'
 import { AuthService } from './services/auth-service'
 import { CapabilityService } from './services/capability-service'
+import { EvidenceService } from './services/evidence-service'
+import { FeedbackService } from './services/feedback-service'
 import { FounderService } from './services/founder-service'
 import { IslandService } from './services/island-service'
+import { MemoryService } from './services/memory-service'
 import { ProcessService } from './services/process-service'
 import { RunEngine } from './services/run-engine'
 import { WorkspaceService } from './services/workspace-service'
@@ -23,6 +26,9 @@ export interface AppServices {
   processes: ProcessService
   islands: IslandService
   runs: RunEngine
+  evidence: EvidenceService
+  feedback: FeedbackService
+  memory: MemoryService
   openClaw?: OpenClawCliConfig
   pool: Pool
   close(): Promise<void>
@@ -74,6 +80,23 @@ export function createAppServices(config: AppServicesConfig): AppServices {
 
   const islands = new IslandService({ islands: repositories.islands, capabilities })
 
+  const memory = new MemoryService({
+    memory: repositories.memory,
+    workspaces,
+    runs: repositories.runs,
+    specifications: repositories.specifications,
+  })
+
+  const feedback = new FeedbackService({
+    feedback: repositories.feedback,
+    runs: repositories.runs,
+    specifications: repositories.specifications,
+    workspaces,
+    memory,
+  })
+
+  const evidence = new EvidenceService({ evidence: repositories.evidence })
+
   const runs = new RunEngine({
     runs: repositories.runs,
     approvals: repositories.approvals,
@@ -86,6 +109,7 @@ export function createAppServices(config: AppServicesConfig): AppServices {
     islands,
     processes,
     openClawConfig: config.openClaw,
+    memoryIntake: memory,
   })
 
   return {
@@ -96,6 +120,9 @@ export function createAppServices(config: AppServicesConfig): AppServices {
     processes,
     islands,
     runs,
+    evidence,
+    feedback,
+    memory,
     openClaw: config.openClaw,
     pool,
     async close() {

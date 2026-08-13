@@ -37,7 +37,6 @@ export type {
 
 export { evidenceSchema, evidenceStatusSchema, evidenceEventSchema } from './evidence'
 export type { Evidence, EvidenceStatus, EvidenceEvent } from './evidence'
-
 export { capabilitySchema } from './capability'
 export type { Capability } from './capability'
 

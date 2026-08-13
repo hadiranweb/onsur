@@ -3,8 +3,12 @@ import type {
   Capability,
   EffectKind,
   Evaluation,
+  Evidence,
+  Feedback,
   Island,
   IslandStatus,
+  MemoryEntry,
+  MemoryScope,
   ProblemItem,
   Process,
   ProcessStatus,
@@ -367,6 +371,37 @@ export interface ArtifactRepository {
 export interface EvaluationRepository {
   create(input: Evaluation): Promise<Evaluation>
   listByRun(runId: string): Promise<Evaluation[]>
+}
+
+// ---------------------------------------------------------------------------
+// Evidence / Feedback / Memory (Sprint 07)
+// ---------------------------------------------------------------------------
+
+export type EvidenceRecord = Evidence & { createdAt: string }
+export type FeedbackRecord = Feedback & { createdAt: string }
+export type MemoryRecord = MemoryEntry & { createdAt: string }
+
+export interface EvidenceRepository {
+  create(input: Omit<EvidenceRecord, 'createdAt'>): Promise<EvidenceRecord>
+  findById(id: string): Promise<EvidenceRecord | null>
+  updateStatus(id: string, status: Evidence['status']): Promise<void>
+  listByWorkspace(workspaceId: string): Promise<EvidenceRecord[]>
+}
+
+export interface FeedbackRepository {
+  create(input: Omit<FeedbackRecord, 'createdAt'>): Promise<FeedbackRecord>
+  findById(id: string): Promise<FeedbackRecord | null>
+  updateStatus(id: string, status: Feedback['status']): Promise<void>
+  listByRun(runId: string): Promise<FeedbackRecord[]>
+}
+
+export interface MemoryRepository {
+  create(input: Omit<MemoryRecord, 'createdAt'>): Promise<MemoryRecord>
+  findById(id: string): Promise<MemoryRecord | null>
+  updateStatus(id: string, status: MemoryEntry['status']): Promise<void>
+  listByOwner(ownerId: string): Promise<MemoryRecord[]>
+  listByWorkspace(workspaceId: string): Promise<MemoryRecord[]>
+  listByScope(scope: MemoryScope): Promise<MemoryRecord[]>
 }
 
 /** Registry of ToolContracts, resolved by id at run time. */

@@ -1,7 +1,11 @@
 import type {
   Capability,
   Evaluation,
+  Evidence,
+  Feedback,
   Island,
+  MemoryEntry,
+  MemoryScope,
   ProblemItem,
   Process,
   Provenance,
@@ -18,9 +22,15 @@ import type {
   EffectRecordRow,
   EffectRepository,
   EvaluationRepository,
+  EvidenceRecord,
+  EvidenceRepository,
+  FeedbackRecord,
+  FeedbackRepository,
   IslandRepository,
   MembershipRecord,
   MembershipRepository,
+  MemoryRecord,
+  MemoryRepository,
   PasswordHasher,
   ProblemRecord,
   ProblemRepository,
@@ -659,5 +669,94 @@ export class InMemoryEvaluationRepository implements EvaluationRepository {
 
   async listByRun(runId: string): Promise<Evaluation[]> {
     return [...this.byId.values()].filter((evaluation) => evaluation.runId.id === runId)
+  }
+}
+
+export class InMemoryEvidenceRepository implements EvidenceRepository {
+  private readonly byId = new Map<string, EvidenceRecord>()
+
+  async create(input: Omit<EvidenceRecord, 'createdAt'>): Promise<EvidenceRecord> {
+    const record: EvidenceRecord = { ...input, createdAt: new Date().toISOString() }
+    this.byId.set(record.id, record)
+    return record
+  }
+
+  async findById(id: string): Promise<EvidenceRecord | null> {
+    return this.byId.get(id) ?? null
+  }
+
+  async updateStatus(id: string, status: Evidence['status']): Promise<void> {
+    const record = this.byId.get(id)
+    if (record) record.status = status
+  }
+
+  async listByWorkspace(workspaceId: string): Promise<EvidenceRecord[]> {
+    return [...this.byId.values()].filter((record) => record.workspaceId === workspaceId)
+  }
+
+  all(): EvidenceRecord[] {
+    return [...this.byId.values()]
+  }
+}
+
+export class InMemoryFeedbackRepository implements FeedbackRepository {
+  private readonly byId = new Map<string, FeedbackRecord>()
+
+  async create(input: Omit<FeedbackRecord, 'createdAt'>): Promise<FeedbackRecord> {
+    const record: FeedbackRecord = { ...input, createdAt: new Date().toISOString() }
+    this.byId.set(record.id, record)
+    return record
+  }
+
+  async findById(id: string): Promise<FeedbackRecord | null> {
+    return this.byId.get(id) ?? null
+  }
+
+  async updateStatus(id: string, status: Feedback['status']): Promise<void> {
+    const record = this.byId.get(id)
+    if (record) record.status = status
+  }
+
+  async listByRun(runId: string): Promise<FeedbackRecord[]> {
+    return [...this.byId.values()].filter((record) => record.runId.id === runId)
+  }
+
+  all(): FeedbackRecord[] {
+    return [...this.byId.values()]
+  }
+}
+
+export class InMemoryMemoryRepository implements MemoryRepository {
+  private readonly byId = new Map<string, MemoryRecord>()
+
+  async create(input: Omit<MemoryRecord, 'createdAt'>): Promise<MemoryRecord> {
+    const record: MemoryRecord = { ...input, createdAt: new Date().toISOString() }
+    this.byId.set(record.id, record)
+    return record
+  }
+
+  async findById(id: string): Promise<MemoryRecord | null> {
+    return this.byId.get(id) ?? null
+  }
+
+  async updateStatus(id: string, status: MemoryEntry['status']): Promise<void> {
+    const record = this.byId.get(id)
+    if (record) record.status = status
+  }
+
+  async listByOwner(ownerId: string): Promise<MemoryRecord[]> {
+    return [...this.byId.values()].filter((record) => record.ownerId === ownerId)
+  }
+
+  async listByWorkspace(workspaceId: string): Promise<MemoryRecord[]> {
+    return [...this.byId.values()].filter((record) => record.workspaceId === workspaceId)
+  }
+
+  async listByScope(scope: MemoryScope): Promise<MemoryRecord[]> {
+    return [...this.byId.values()].filter((record) => record.scope === scope)
+  }
+
+  all(): MemoryRecord[] {
+    return [...this.byId.values()]
   }
 }

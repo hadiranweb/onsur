@@ -125,6 +125,7 @@ describe('process validation', () => {
 describe('evidence duplicate detection', () => {
   const evidence = (id: string, fingerprint: string): Evidence => ({
     id,
+    workspaceId: 'ws-1',
     kind: 'evidence',
     content: 'content',
     fingerprint,

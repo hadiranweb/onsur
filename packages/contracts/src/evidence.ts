@@ -7,6 +7,8 @@ import { provenanceSchema } from './provenance'
  * Evidence: an independently addressed unit of support, distinct from memory
  * and knowledge. Every piece of evidence carries an exact content fingerprint
  * for duplicate detection and passes through a quality gate.
+ *
+ * Evidence is workspace-scoped (raw user data is private by default).
  */
 
 export const evidenceStatusSchema = z.enum(['intake', 'pending_review', 'accepted', 'rejected'])
@@ -19,6 +21,7 @@ export type EvidenceEvent = z.infer<typeof evidenceEventSchema>
 
 export const evidenceSchema = z.object({
   id: idSchema,
+  workspaceId: idSchema,
   kind: evidenceKindSchema,
   content: z.string().min(1).max(20000),
   fingerprint: z.string().min(1).max(256),

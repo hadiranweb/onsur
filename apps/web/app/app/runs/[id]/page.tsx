@@ -27,6 +27,7 @@ export default async function RunDetail({
 
   const { run, events, approvals, toolCalls, effects, artifacts, evaluations } = view
   const pending = approvals.filter((approval) => approval.status === 'pending')
+  const feedback = await getApp().feedback.listByRun(run.id)
 
   return (
     <main>
@@ -157,6 +158,31 @@ export default async function RunDetail({
             <button type="submit" name="verdict" value="needs_review">
               Needs review
             </button>
+          </form>
+        )}
+      </section>
+
+      <section className="run__feedback">
+        <h2>Feedback</h2>
+        {feedback.length === 0 ? (
+          <p>No feedback yet.</p>
+        ) : (
+          <ul>
+            {feedback.map((entry) => (
+              <li key={entry.id}>
+                [{entry.status}] {entry.content}
+              </li>
+            ))}
+          </ul>
+        )}
+        {run.status === 'completed' && (
+          <form action="/api/feedback" method="post" className="founder__form">
+            <input type="hidden" name="runId" value={run.id} />
+            <label>
+              Add feedback
+              <textarea name="content" rows={3} required />
+            </label>
+            <button type="submit">Submit feedback</button>
           </form>
         )}
       </section>

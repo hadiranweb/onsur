@@ -148,6 +148,7 @@ describe('canonical contracts', () => {
   describe('evidence', () => {
     const valid = {
       id: 'ev-1',
+      workspaceId: 'ws-1',
       kind: 'evidence',
       content: 'log line showing 500 on /reset',
       fingerprint: 'sha256:abcdef',
@@ -337,6 +338,8 @@ describe('canonical contracts', () => {
     it('enforces a known scope', () => {
       const valid = {
         id: 'mem-1',
+        workspaceId: 'ws-1',
+        ownerId: 'user-1',
         scope: 'workspace',
         content: 'remember this',
         status: 'candidate',

@@ -376,6 +376,105 @@ describe('postgres persistence (integration)', () => {
     expect(view.approvals[0]!.status).toBe('rejected')
     expect(view.events.map((event) => event.type)).toContain('reject')
   })
+
+  it('runs the evidence lifecycle with duplicate detection through real persistence', async () => {
+    const registered = await app.auth.register({
+      email: uniqueEmail(),
+      password: 'password123',
+      displayName: 'Evidence Actor',
+    })
+    const personal = (await app.workspaces.getPersonalWorkspace(registered.user.id))!
+
+    const intake = await app.evidence.intake({
+      workspaceId: personal.id,
+      kind: 'evidence',
+      content: 'the deployment failed on the database migration step',
+      actorUserId: registered.user.id,
+    })
+    expect(intake.status).toBe('intake')
+    expect(intake.fingerprint).toMatch(/^sha256:/)
+
+    expect((await app.evidence.submit(intake.id)).status).toBe('pending_review')
+    expect((await app.evidence.accept(intake.id)).status).toBe('accepted')
+
+    const duplicates = await app.evidence.findDuplicates(
+      personal.id,
+      'the deployment failed on the database migration step',
+    )
+    expect(duplicates.exact.map((entry) => entry.id)).toContain(intake.id)
+  })
+
+  it('runs feedback -> memory candidate through real persistence', async () => {
+    const registered = await app.auth.register({
+      email: uniqueEmail(),
+      password: 'password123',
+      displayName: 'Feedback Actor',
+    })
+    const personal = (await app.workspaces.getPersonalWorkspace(registered.user.id))!
+    const ref = await app.islands.ensureReferenceIsland({ actorUserId: registered.user.id })
+    const started = await app.founder.start(
+      registered.user,
+      personal.id,
+      'Feedback integration problem statement.',
+    )
+    const confirmed = await app.founder.confirm(registered.user, personal.id, started.session.id)
+    const run = await app.runs.enqueue({
+      actorUserId: registered.user.id,
+      islandId: ref.island.id,
+      problemSpecId: confirmed.confirmed!.id,
+    })
+    await waitForRunStatus(app.runs, run.id, ['completed'])
+
+    const submitted = await app.feedback.submit({
+      runId: run.id,
+      content: 'the retry path should be cached',
+      actorUserId: registered.user.id,
+    })
+    expect(submitted.runId.id).toBe(run.id)
+
+    await app.feedback.triage(submitted.id)
+    await app.feedback.accept(submitted.id)
+    await app.feedback.apply(submitted.id)
+
+    const memory = await app.memory.listWorkspace(registered.user.id, personal.id)
+    expect(memory).toHaveLength(1)
+    expect(memory[0]!.status).toBe('candidate')
+    expect(memory[0]!.sourceRun).toEqual({ id: run.id, kind: 'run' })
+  })
+
+  it('denies cross-workspace memory retrieval through real persistence', async () => {
+    const alice = await app.auth.register({
+      email: uniqueEmail(),
+      password: 'password123',
+      displayName: 'Alice M',
+    })
+    const bob = await app.auth.register({
+      email: uniqueEmail(),
+      password: 'password123',
+      displayName: 'Bob M',
+    })
+    const alicePersonal = (await app.workspaces.getPersonalWorkspace(alice.user.id))!
+    const bobPersonal = (await app.workspaces.getPersonalWorkspace(bob.user.id))!
+
+    const entry = await app.memory.createCandidate({
+      workspaceId: alicePersonal.id,
+      ownerId: alice.user.id,
+      scope: 'workspace',
+      content: 'alice workspace private memory',
+      actorUserId: alice.user.id,
+    })
+
+    const bobsList = await app.memory.listForUser(bob.user.id)
+    expect(bobsList.map((entry) => entry.id)).not.toContain(entry.id)
+
+    await expect(app.memory.listWorkspace(bob.user.id, alicePersonal.id)).rejects.toMatchObject({
+      code: 'FORBIDDEN',
+    })
+    await expect(app.memory.get(entry.id, bob.user.id)).rejects.toMatchObject({
+      code: 'FORBIDDEN',
+    })
+    expect(bobPersonal.id).not.toBe(alicePersonal.id)
+  })
 })
 
 async function waitForRunStatus(

@@ -5,8 +5,12 @@ import type {
   Capability,
   EffectKind,
   Evaluation,
+  Evidence,
+  Feedback,
   Island,
   IslandStatus,
+  MemoryEntry,
+  MemoryScope,
   ProblemItem,
   Process,
   ProcessStatus,
@@ -29,9 +33,15 @@ import type {
   EffectRecordRow,
   EffectRepository,
   EvaluationRepository,
+  EvidenceRecord,
+  EvidenceRepository,
+  FeedbackRecord,
+  FeedbackRepository,
   IslandRepository,
   MembershipRecord,
   MembershipRepository,
+  MemoryRecord,
+  MemoryRepository,
   ProblemRecord,
   ProblemRepository,
   ProblemSpecificationRecord,
@@ -546,6 +556,9 @@ export interface PostgresRepositories {
   effects: EffectRepository
   artifacts: ArtifactRepository
   evaluations: EvaluationRepository
+  evidence: EvidenceRepository
+  feedback: FeedbackRepository
+  memory: MemoryRepository
 }
 
 export function createPostgresRepositories(pool: Pool): PostgresRepositories {
@@ -566,6 +579,9 @@ export function createPostgresRepositories(pool: Pool): PostgresRepositories {
     effects: new PostgresEffectRepository(pool),
     artifacts: new PostgresArtifactRepository(pool),
     evaluations: new PostgresEvaluationRepository(pool),
+    evidence: new PostgresEvidenceRepository(pool),
+    feedback: new PostgresFeedbackRepository(pool),
+    memory: new PostgresMemoryRepository(pool),
   }
 }
 
@@ -856,6 +872,47 @@ function mapEvaluation(row: Record<string, unknown>): Evaluation {
   }
 }
 
+function mapEvidence(row: Record<string, unknown>): EvidenceRecord {
+  return {
+    id: row.id as string,
+    workspaceId: row.workspace_id as string,
+    kind: row.kind as Evidence['kind'],
+    content: row.content as string,
+    fingerprint: row.fingerprint as string,
+    status: row.status as Evidence['status'],
+    source: (row.source as Evidence['source']) ?? undefined,
+    provenance: row.provenance as Provenance,
+    createdAt: toIso(row.created_at),
+  }
+}
+
+function mapFeedback(row: Record<string, unknown>): FeedbackRecord {
+  return {
+    id: row.id as string,
+    runId: { id: row.run_id as string, kind: 'run' },
+    content: row.content as string,
+    status: row.status as Feedback['status'],
+    provenance: row.provenance as Provenance,
+    createdAt: toIso(row.created_at),
+  }
+}
+
+function mapMemory(row: Record<string, unknown>): MemoryRecord {
+  return {
+    id: row.id as string,
+    workspaceId: row.workspace_id as string,
+    ownerId: row.owner_id as string,
+    scope: row.scope as MemoryScope,
+    content: row.content as string,
+    fingerprint: (row.fingerprint as string | null) ?? undefined,
+    tags: (row.tags as string[]) ?? [],
+    sourceRun: (row.source_run as MemoryEntry['sourceRun']) ?? undefined,
+    status: row.status as MemoryEntry['status'],
+    provenance: row.provenance as Provenance,
+    createdAt: toIso(row.created_at),
+  }
+}
+
 export class PostgresRunRepository implements RunRepository {
   constructor(private readonly pool: Pool) {}
 
@@ -1091,6 +1148,152 @@ export class PostgresEvaluationRepository implements EvaluationRepository {
       [runId],
     )
     return result.rows.map(mapEvaluation)
+  }
+}
+
+export class PostgresEvidenceRepository implements EvidenceRepository {
+  constructor(private readonly pool: Pool) {}
+
+  async create(input: Omit<EvidenceRecord, 'createdAt'>): Promise<EvidenceRecord> {
+    const result = await this.pool.query(
+      `INSERT INTO evidence (id, workspace_id, kind, content, fingerprint, status, source, provenance)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+       RETURNING id, workspace_id, kind, content, fingerprint, status, source, provenance, created_at`,
+      [
+        input.id,
+        input.workspaceId,
+        input.kind,
+        input.content,
+        input.fingerprint,
+        input.status,
+        input.source ? JSON.stringify(input.source) : null,
+        JSON.stringify(input.provenance),
+      ],
+    )
+    return mapEvidence(result.rows[0])
+  }
+
+  async findById(id: string): Promise<EvidenceRecord | null> {
+    const result = await this.pool.query(
+      `SELECT id, workspace_id, kind, content, fingerprint, status, source, provenance, created_at
+         FROM evidence WHERE id = $1`,
+      [id],
+    )
+    return result.rows[0] ? mapEvidence(result.rows[0]) : null
+  }
+
+  async updateStatus(id: string, status: Evidence['status']): Promise<void> {
+    await this.pool.query(`UPDATE evidence SET status = $2 WHERE id = $1`, [id, status])
+  }
+
+  async listByWorkspace(workspaceId: string): Promise<EvidenceRecord[]> {
+    const result = await this.pool.query(
+      `SELECT id, workspace_id, kind, content, fingerprint, status, source, provenance, created_at
+         FROM evidence WHERE workspace_id = $1 ORDER BY created_at ASC`,
+      [workspaceId],
+    )
+    return result.rows.map(mapEvidence)
+  }
+}
+
+export class PostgresFeedbackRepository implements FeedbackRepository {
+  constructor(private readonly pool: Pool) {}
+
+  async create(input: Omit<FeedbackRecord, 'createdAt'>): Promise<FeedbackRecord> {
+    const result = await this.pool.query(
+      `INSERT INTO feedback (id, run_id, content, status, provenance)
+       VALUES ($1, $2, $3, $4, $5)
+       RETURNING id, run_id, content, status, provenance, created_at`,
+      [input.id, input.runId.id, input.content, input.status, JSON.stringify(input.provenance)],
+    )
+    return mapFeedback(result.rows[0])
+  }
+
+  async findById(id: string): Promise<FeedbackRecord | null> {
+    const result = await this.pool.query(
+      `SELECT id, run_id, content, status, provenance, created_at FROM feedback WHERE id = $1`,
+      [id],
+    )
+    return result.rows[0] ? mapFeedback(result.rows[0]) : null
+  }
+
+  async updateStatus(id: string, status: Feedback['status']): Promise<void> {
+    await this.pool.query(`UPDATE feedback SET status = $2 WHERE id = $1`, [id, status])
+  }
+
+  async listByRun(runId: string): Promise<FeedbackRecord[]> {
+    const result = await this.pool.query(
+      `SELECT id, run_id, content, status, provenance, created_at
+         FROM feedback WHERE run_id = $1 ORDER BY created_at ASC`,
+      [runId],
+    )
+    return result.rows.map(mapFeedback)
+  }
+}
+
+export class PostgresMemoryRepository implements MemoryRepository {
+  constructor(private readonly pool: Pool) {}
+
+  async create(input: Omit<MemoryRecord, 'createdAt'>): Promise<MemoryRecord> {
+    const result = await this.pool.query(
+      `INSERT INTO memory_entries
+         (id, workspace_id, owner_id, scope, content, fingerprint, tags, source_run, status, provenance)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+       RETURNING id, workspace_id, owner_id, scope, content, fingerprint, tags, source_run, status, provenance, created_at`,
+      [
+        input.id,
+        input.workspaceId,
+        input.ownerId,
+        input.scope,
+        input.content,
+        input.fingerprint ?? null,
+        JSON.stringify(input.tags),
+        input.sourceRun ? JSON.stringify(input.sourceRun) : null,
+        input.status,
+        JSON.stringify(input.provenance),
+      ],
+    )
+    return mapMemory(result.rows[0])
+  }
+
+  async findById(id: string): Promise<MemoryRecord | null> {
+    const result = await this.pool.query(
+      `SELECT id, workspace_id, owner_id, scope, content, fingerprint, tags, source_run, status, provenance, created_at
+         FROM memory_entries WHERE id = $1`,
+      [id],
+    )
+    return result.rows[0] ? mapMemory(result.rows[0]) : null
+  }
+
+  async updateStatus(id: string, status: MemoryEntry['status']): Promise<void> {
+    await this.pool.query(`UPDATE memory_entries SET status = $2 WHERE id = $1`, [id, status])
+  }
+
+  async listByOwner(ownerId: string): Promise<MemoryRecord[]> {
+    const result = await this.pool.query(
+      `SELECT id, workspace_id, owner_id, scope, content, fingerprint, tags, source_run, status, provenance, created_at
+         FROM memory_entries WHERE owner_id = $1 ORDER BY created_at ASC`,
+      [ownerId],
+    )
+    return result.rows.map(mapMemory)
+  }
+
+  async listByWorkspace(workspaceId: string): Promise<MemoryRecord[]> {
+    const result = await this.pool.query(
+      `SELECT id, workspace_id, owner_id, scope, content, fingerprint, tags, source_run, status, provenance, created_at
+         FROM memory_entries WHERE workspace_id = $1 ORDER BY created_at ASC`,
+      [workspaceId],
+    )
+    return result.rows.map(mapMemory)
+  }
+
+  async listByScope(scope: MemoryScope): Promise<MemoryRecord[]> {
+    const result = await this.pool.query(
+      `SELECT id, workspace_id, owner_id, scope, content, fingerprint, tags, source_run, status, provenance, created_at
+         FROM memory_entries WHERE scope = $1 ORDER BY created_at ASC`,
+      [scope],
+    )
+    return result.rows.map(mapMemory)
   }
 }
 

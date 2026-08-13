@@ -7,7 +7,10 @@ import { provenanceSchema } from './provenance'
  *
  * Runtime output is only ever a memory *candidate*; promotion to canonical
  * memory requires authorization and never happens automatically. Scope
- * (private | workspace | shared) is enforced on write and read.
+ * (private | workspace | shared) is enforced on write and read:
+ *   - private:   owner only
+ *   - workspace: members of the owning workspace
+ *   - shared:    members write; any authenticated user may read
  */
 
 export const memoryScopeSchema = z.enum(['private', 'workspace', 'shared'])
@@ -20,6 +23,8 @@ export type MemoryStatus = z.infer<typeof memoryStatusSchema>
 
 export const memoryEntrySchema = z.object({
   id: idSchema,
+  workspaceId: idSchema,
+  ownerId: idSchema,
   scope: memoryScopeSchema,
   content: z.string().min(1).max(20000),
   fingerprint: z.string().min(1).max(256).optional(),

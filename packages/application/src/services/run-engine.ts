@@ -57,6 +57,14 @@ export interface RunView {
   evaluations: Evaluation[]
 }
 
+/**
+ * Runtime memory output is ingested as candidates only. Implemented by the
+ * MemoryService; the run engine calls it after a run completes.
+ */
+export interface RunMemoryIntake {
+  ingestRunCandidates(runId: string, candidates: string[]): Promise<void>
+}
+
 export interface RunEngineDeps {
   runs: RunRepository
   approvals: ApprovalRepository
@@ -71,6 +79,7 @@ export interface RunEngineDeps {
   now?: () => Date
   runtimeFactory?: (island: Island, gate: ToolGate) => RuntimeAdapter
   openClawConfig?: OpenClawCliConfig
+  memoryIntake?: RunMemoryIntake
 }
 
 type Decision = 'approved' | 'rejected' | 'cancelled'
@@ -298,6 +307,10 @@ export class RunEngine {
               return
             }
             await this.persistResultArtifact(runId, event.result)
+            const candidates = extractMemoryCandidates(event.result)
+            if (candidates.length > 0 && this.deps.memoryIntake) {
+              await this.deps.memoryIntake.ingestRunCandidates(runId, candidates)
+            }
             await this.appendEvent(runId, 'complete', {})
             await this.transition(runId, 'complete')
             return
@@ -529,6 +542,18 @@ function defaultRuntimeFactory(
     'INVALID_INPUT',
     `no runtime adapter for runtime kind "${island.runtime.runtime}"`,
   )
+}
+
+/** Extract `memoryCandidates` from a completed runtime result, if present. */
+export function extractMemoryCandidates(result: unknown): string[] {
+  if (typeof result !== 'object' || result === null) {
+    return []
+  }
+  const candidates = (result as { memoryCandidates?: unknown }).memoryCandidates
+  if (!Array.isArray(candidates)) {
+    return []
+  }
+  return candidates.filter((candidate): candidate is string => typeof candidate === 'string')
 }
 
 // Re-export for backwards compatibility; the canonical implementation lives in

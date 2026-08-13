@@ -50,6 +50,12 @@ export type {
   ToolGate,
   ToolGateRequest,
   ToolGateResult,
+  EvidenceRecord,
+  EvidenceRepository,
+  FeedbackRecord,
+  FeedbackRepository,
+  MemoryRecord,
+  MemoryRepository,
 } from './ports'
 
 export { AuthService, SESSION_COOKIE_NAME, SESSION_TTL_MS } from './services/auth-service'
@@ -74,8 +80,24 @@ export type {
   ResolveOrCreateResult,
 } from './services/island-service'
 
-export { RunEngine, normalizeError } from './services/run-engine'
-export type { EnqueueRunInput, RunEngineDeps, RunView } from './services/run-engine'
+export { RunEngine, normalizeError, extractMemoryCandidates } from './services/run-engine'
+export type {
+  EnqueueRunInput,
+  RunEngineDeps,
+  RunView,
+  RunMemoryIntake,
+} from './services/run-engine'
+
+export { EvidenceService } from './services/evidence-service'
+export type { EvidenceServiceDeps, IntakeEvidenceInput } from './services/evidence-service'
+
+export { FeedbackService } from './services/feedback-service'
+export type { FeedbackServiceDeps, SubmitFeedbackInput } from './services/feedback-service'
+
+export { MemoryService } from './services/memory-service'
+export type { MemoryServiceDeps } from './services/memory-service'
+
+export { fingerprintContent } from './util/fingerprint'
 
 export { FakeRuntimeAdapter } from './infrastructure/fake-runtime-adapter'
 export type {
@@ -124,6 +146,9 @@ export { PostgresToolCallRepository } from './infrastructure/postgres-repositori
 export { PostgresEffectRepository } from './infrastructure/postgres-repositories'
 export { PostgresArtifactRepository } from './infrastructure/postgres-repositories'
 export { PostgresEvaluationRepository } from './infrastructure/postgres-repositories'
+export { PostgresEvidenceRepository } from './infrastructure/postgres-repositories'
+export { PostgresFeedbackRepository } from './infrastructure/postgres-repositories'
+export { PostgresMemoryRepository } from './infrastructure/postgres-repositories'
 export { ScryptPasswordHasher } from './infrastructure/scrypt-password-hasher'
 export { HmacSessionCodec } from './infrastructure/session-codec'
 export { readMigrations, runMigrations } from './infrastructure/migrate'

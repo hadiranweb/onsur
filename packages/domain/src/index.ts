@@ -66,7 +66,14 @@ export {
   nextEvidenceState,
   isExactDuplicate,
   findExactDuplicates,
+  normalizeForComparison,
+  tokenize,
+  jaccardSimilarity,
+  isApproximateDuplicate,
+  evaluateEvidenceQuality,
+  MIN_EVIDENCE_CONTENT_LENGTH,
 } from './rules/evidence'
+export type { EvidenceQualityReport } from './rules/evidence'
 
 export { feedbackTransitions, canFeedbackTransition, nextFeedbackState } from './rules/feedback'
 
@@ -87,3 +94,5 @@ export type { SessionLike } from './rules/identity'
 export { spsTransitions, canSpsTransition, nextSpsState } from './rules/sps'
 
 export { requiresApproval, isToolExecutionAuthorized } from './rules/authority'
+
+export { canWriteMemory, canReadMemory } from './rules/memory'
