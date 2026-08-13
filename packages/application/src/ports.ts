@@ -1,6 +1,7 @@
 import type {
   ArtifactKind,
   Capability,
+  ConnectorStatus,
   EffectKind,
   Evaluation,
   Evidence,
@@ -11,6 +12,8 @@ import type {
   KnowledgeStatus,
   MemoryEntry,
   MemoryScope,
+  PackageDeliveryStatus,
+  PackageKind,
   ProblemItem,
   Process,
   ProcessStatus,
@@ -431,6 +434,77 @@ export interface VersionProposalRepository {
   updateStatus(id: string, status: VersionProposalStatus): Promise<void>
   listByTarget(targetId: string): Promise<VersionProposalRecord[]>
   list(): Promise<VersionProposalRecord[]>
+}
+
+// ---------------------------------------------------------------------------
+// Element Package Protocol / outbox / connectors (Sprint 09)
+// ---------------------------------------------------------------------------
+
+export interface OutboxMessageRecord {
+  id: string
+  kind: PackageKind
+  connectorId: string
+  correlationId: string
+  causationId: string | null
+  payload: Record<string, unknown>
+  status: PackageDeliveryStatus
+  attempts: number
+  availableAt: string
+  sentAt: string | null
+  error: string | null
+  createdAt: string
+}
+
+/**
+ * A transactional scope: domain mutations and outbox writes run in one
+ * transaction so they commit or roll back together.
+ */
+export interface TransactionalScope {
+  query(text: string, values?: unknown[]): Promise<{ rows: Record<string, unknown>[] }>
+}
+
+export interface TransactionRunner {
+  run<T>(fn: (tx: TransactionalScope) => Promise<T>): Promise<T>
+}
+
+export interface OutboxRepository {
+  /** Insert an outbox message inside an existing transaction scope. */
+  createInTransaction(
+    tx: TransactionalScope,
+    input: Omit<OutboxMessageRecord, 'createdAt'>,
+  ): Promise<void>
+  create(input: Omit<OutboxMessageRecord, 'createdAt'>): Promise<OutboxMessageRecord>
+  findById(id: string): Promise<OutboxMessageRecord | null>
+  listPending(now: string, limit: number): Promise<OutboxMessageRecord[]>
+  markSent(id: string): Promise<void>
+  markFailed(id: string, error: string, availableAt: string): Promise<void>
+  list(): Promise<OutboxMessageRecord[]>
+}
+
+/** A connector receives outbox messages and reports its status honestly. */
+export interface Connector {
+  readonly id: string
+  readonly name: string
+  check(): Promise<{ status: ConnectorStatus; detail?: string }>
+  deliver(message: OutboxMessageRecord): Promise<void>
+}
+
+export interface PackageEventRecord {
+  id: string
+  kind: PackageKind
+  correlationId: string
+  causationId: string | null
+  payload: Record<string, unknown>
+  provenance: Provenance
+  createdAt: string
+}
+
+export interface PackageEventRepository {
+  createInTransaction(
+    tx: TransactionalScope,
+    input: Omit<PackageEventRecord, 'createdAt'>,
+  ): Promise<void>
+  list(): Promise<PackageEventRecord[]>
 }
 
 /** Registry of ToolContracts, resolved by id at run time. */

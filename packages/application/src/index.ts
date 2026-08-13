@@ -60,6 +60,13 @@ export type {
   KnowledgeRepository,
   VersionProposalRecord,
   VersionProposalRepository,
+  OutboxMessageRecord,
+  OutboxRepository,
+  TransactionalScope,
+  TransactionRunner,
+  Connector,
+  PackageEventRecord,
+  PackageEventRepository,
 } from './ports'
 
 export { AuthService, SESSION_COOKIE_NAME, SESSION_TTL_MS } from './services/auth-service'
@@ -109,6 +116,16 @@ export type {
   VersionProposalServiceDeps,
   ProposeVersionInput,
 } from './services/version-proposal-service'
+
+export { PackageService } from './services/package-service'
+export type { PackageServiceDeps, PublishPackageInput } from './services/package-service'
+
+export {
+  PgOutboxRepository,
+  PgPackageEventRepository,
+  PgTransactionRunner,
+} from './infrastructure/outbox'
+export { RelayConnector } from './infrastructure/relay-connector'
 
 export { fingerprintContent } from './util/fingerprint'
 

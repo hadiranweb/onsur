@@ -515,6 +515,61 @@ describe('postgres persistence (integration)', () => {
       'always retry with exponential backoff',
     )
   })
+
+  it('publishes a package atomically (outbox + package event in one transaction)', async () => {
+    const message = await app.packages.publish({
+      kind: 'command',
+      connectorId: 'relay',
+      correlationId: 'corr-it-1',
+      payload: { op: 'go' },
+      actorUserId: 'system',
+    })
+    expect(message.status).toBe('pending')
+
+    const outbox = await app.packages.getOutbox()
+    expect(outbox.map((entry) => entry.id)).toContain(message.id)
+
+    const eventResult = await pool.query(
+      `SELECT id FROM package_events WHERE correlation_id = 'corr-it-1'`,
+    )
+    expect(eventResult.rows).toHaveLength(1)
+  })
+
+  it('delivers through the relay connector with correlation surviving, idempotently', async () => {
+    // Flush any pending messages from earlier tests for a deterministic batch.
+    await app.packages.deliverPending(100)
+
+    await app.packages.publish({
+      kind: 'command',
+      connectorId: 'relay',
+      correlationId: 'corr-it-2',
+      payload: { op: 'deliver' },
+      actorUserId: 'system',
+    })
+
+    const delivered = await app.packages.deliverPending(10)
+    expect(delivered).toBe(1)
+
+    const deliveryResult = await pool.query(
+      `SELECT correlation_id FROM connector_deliveries WHERE correlation_id = 'corr-it-2'`,
+    )
+    expect(deliveryResult.rows).toHaveLength(1)
+    expect(deliveryResult.rows[0].correlation_id).toBe('corr-it-2')
+
+    // Duplicate delivery must NOT duplicate the effect (idempotent).
+    await app.packages.deliverPending(10)
+    const still = await pool.query(
+      `SELECT COUNT(*)::int AS n FROM connector_deliveries WHERE correlation_id = 'corr-it-2'`,
+    )
+    expect(still.rows[0].n).toBe(1)
+  })
+
+  it('reports honest connector status', async () => {
+    const connector = app.packages.getConnector('relay')
+    expect(connector).toBeDefined()
+    expect(await connector!.check()).toEqual({ status: 'connected' })
+    expect(app.packages.getConnector('missing')).toBeUndefined()
+  })
 })
 
 async function waitForRunStatus(

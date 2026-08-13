@@ -101,3 +101,5 @@ export { spsTransitions, canSpsTransition, nextSpsState } from './rules/sps'
 export { requiresApproval, isToolExecutionAuthorized } from './rules/authority'
 
 export { canWriteMemory, canReadMemory } from './rules/memory'
+
+export { validatePackageCorrelation, correlationSurvives, deliveryKey } from './rules/package'

@@ -17,6 +17,13 @@ import { ProcessService } from './services/process-service'
 import { RunEngine } from './services/run-engine'
 import { VersionProposalService } from './services/version-proposal-service'
 import { WorkspaceService } from './services/workspace-service'
+import { PackageService } from './services/package-service'
+import {
+  PgOutboxRepository,
+  PgPackageEventRepository,
+  PgTransactionRunner,
+} from './infrastructure/outbox'
+import { RelayConnector } from './infrastructure/relay-connector'
 import type { OpenClawCliConfig } from './openclaw/cli'
 import type { StructuredLlmPort } from './ports'
 
@@ -33,6 +40,7 @@ export interface AppServices {
   memory: MemoryService
   knowledge: KnowledgeService
   proposals: VersionProposalService
+  packages: PackageService
   openClaw?: OpenClawCliConfig
   pool: Pool
   close(): Promise<void>
@@ -110,6 +118,13 @@ export function createAppServices(config: AppServicesConfig): AppServices {
     islands,
   })
 
+  const packages = new PackageService({
+    outbox: new PgOutboxRepository(pool),
+    packageEvents: new PgPackageEventRepository(pool),
+    transactions: new PgTransactionRunner(pool),
+    connectors: [new RelayConnector(pool)],
+  })
+
   const runs = new RunEngine({
     runs: repositories.runs,
     approvals: repositories.approvals,
@@ -138,6 +153,7 @@ export function createAppServices(config: AppServicesConfig): AppServices {
     memory,
     knowledge,
     proposals,
+    packages,
     openClaw: config.openClaw,
     pool,
     async close() {

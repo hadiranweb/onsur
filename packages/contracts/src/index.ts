@@ -80,8 +80,18 @@ export type { Agent, AgentRole } from './agent'
 export { toolContractSchema, toolCallSchema, effectRecordSchema, effectKindSchema } from './tool'
 export type { ToolContract, ToolCall, EffectRecord, EffectKind } from './tool'
 
-export { packageEnvelopeSchema, packageKindSchema } from './package'
-export type { PackageEnvelope, PackageKind } from './package'
+export {
+  packageEnvelopeSchema,
+  packageKindSchema,
+  packageDeliveryStatusSchema,
+  connectorStatusSchema,
+} from './package'
+export type {
+  PackageEnvelope,
+  PackageKind,
+  PackageDeliveryStatus,
+  ConnectorStatus,
+} from './package'
 
 export {
   runSchema,
