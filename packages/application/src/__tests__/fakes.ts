@@ -4,6 +4,7 @@ import type {
   Evidence,
   Feedback,
   Island,
+  Knowledge,
   MemoryEntry,
   MemoryScope,
   ProblemItem,
@@ -11,6 +12,7 @@ import type {
   Provenance,
   RunEventType,
   SpsStatus,
+  VersionProposal,
   WorkspaceRole,
 } from '@element-plus/contracts'
 import type {
@@ -27,6 +29,8 @@ import type {
   FeedbackRecord,
   FeedbackRepository,
   IslandRepository,
+  KnowledgeRecord,
+  KnowledgeRepository,
   MembershipRecord,
   MembershipRepository,
   MemoryRecord,
@@ -51,6 +55,8 @@ import type {
   ToolCallStatus,
   UserRecord,
   UserRepository,
+  VersionProposalRecord,
+  VersionProposalRepository,
   WorkspaceRecord,
   WorkspaceRepository,
 } from '../ports'
@@ -757,6 +763,72 @@ export class InMemoryMemoryRepository implements MemoryRepository {
   }
 
   all(): MemoryRecord[] {
+    return [...this.byId.values()]
+  }
+}
+
+export class InMemoryKnowledgeRepository implements KnowledgeRepository {
+  private readonly byKey = new Map<string, KnowledgeRecord>()
+
+  async create(input: Omit<KnowledgeRecord, 'createdAt'>): Promise<KnowledgeRecord> {
+    const record: KnowledgeRecord = { ...input, createdAt: new Date().toISOString() }
+    this.byKey.set(`${record.id}::${record.version}`, record)
+    return record
+  }
+
+  async findById(id: string): Promise<KnowledgeRecord | null> {
+    return this.findLatestById(id)
+  }
+
+  async findLatestById(id: string): Promise<KnowledgeRecord | null> {
+    return maxVersion([...this.byKey.values()].filter((knowledge) => knowledge.id === id))
+  }
+
+  async findVersion(id: string, version: string): Promise<KnowledgeRecord | null> {
+    return this.byKey.get(`${id}::${version}`) ?? null
+  }
+
+  async listByIdentity(id: string): Promise<KnowledgeRecord[]> {
+    return [...this.byKey.values()].filter((knowledge) => knowledge.id === id)
+  }
+
+  async listByWorkspace(workspaceId: string): Promise<KnowledgeRecord[]> {
+    return [...this.byKey.values()].filter((knowledge) => knowledge.workspaceId === workspaceId)
+  }
+
+  async updateStatus(id: string, version: string, status: Knowledge['status']): Promise<void> {
+    const record = this.byKey.get(`${id}::${version}`)
+    if (record) record.status = status
+  }
+
+  all(): KnowledgeRecord[] {
+    return [...this.byKey.values()]
+  }
+}
+
+export class InMemoryVersionProposalRepository implements VersionProposalRepository {
+  private readonly byId = new Map<string, VersionProposalRecord>()
+
+  async create(input: Omit<VersionProposalRecord, 'createdAt'>): Promise<VersionProposalRecord> {
+    const record: VersionProposalRecord = { ...input, createdAt: new Date().toISOString() }
+    this.byId.set(record.id, record)
+    return record
+  }
+
+  async findById(id: string): Promise<VersionProposalRecord | null> {
+    return this.byId.get(id) ?? null
+  }
+
+  async updateStatus(id: string, status: VersionProposal['status']): Promise<void> {
+    const record = this.byId.get(id)
+    if (record) record.status = status
+  }
+
+  async listByTarget(targetId: string): Promise<VersionProposalRecord[]> {
+    return [...this.byId.values()].filter((proposal) => proposal.target.id === targetId)
+  }
+
+  async list(): Promise<VersionProposalRecord[]> {
     return [...this.byId.values()]
   }
 }

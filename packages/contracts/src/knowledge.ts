@@ -5,17 +5,24 @@ import { provenanceSchema } from './provenance'
 /**
  * Knowledge and VersionProposal.
  *
- * Knowledge is governed, versioned, and always backed by evidence references.
- * It evolves only through a VersionProposal review lifecycle; there is no
- * automatic canonical merge, and prior versions are preserved.
+ * Knowledge is governed, versioned, workspace-scoped, and always backed by
+ * evidence references. It evolves only through a VersionProposal review
+ * lifecycle; there is no automatic canonical merge, and prior versions are
+ * preserved.
  */
 
 export const knowledgeStatusSchema = z.enum(['draft', 'published', 'superseded'])
 
 export type KnowledgeStatus = z.infer<typeof knowledgeStatusSchema>
 
+export const knowledgeEventSchema = z.enum(['publish', 'supersede'])
+
+export type KnowledgeEvent = z.infer<typeof knowledgeEventSchema>
+
 export const knowledgeSchema = z.object({
   id: idSchema,
+  workspaceId: idSchema,
+  ownerId: idSchema,
   version: versionSchema,
   status: knowledgeStatusSchema,
   title: z.string().min(1).max(200),
@@ -53,6 +60,8 @@ export const versionProposalSchema = z.object({
   fromVersion: versionSchema,
   toVersion: versionSchema,
   rationale: z.string().min(1).max(20000),
+  /** Proposed new content for `knowledge` targets (ignored for others). */
+  content: z.string().max(50000).optional(),
   evidenceRefs: z.array(referenceSchema).default([]),
   status: versionProposalStatusSchema,
   provenance: provenanceSchema,

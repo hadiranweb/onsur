@@ -56,6 +56,10 @@ export type {
   FeedbackRepository,
   MemoryRecord,
   MemoryRepository,
+  KnowledgeRecord,
+  KnowledgeRepository,
+  VersionProposalRecord,
+  VersionProposalRepository,
 } from './ports'
 
 export { AuthService, SESSION_COOKIE_NAME, SESSION_TTL_MS } from './services/auth-service'
@@ -96,6 +100,15 @@ export type { FeedbackServiceDeps, SubmitFeedbackInput } from './services/feedba
 
 export { MemoryService } from './services/memory-service'
 export type { MemoryServiceDeps } from './services/memory-service'
+
+export { KnowledgeService } from './services/knowledge-service'
+export type { KnowledgeServiceDeps, CreateKnowledgeInput } from './services/knowledge-service'
+
+export { VersionProposalService } from './services/version-proposal-service'
+export type {
+  VersionProposalServiceDeps,
+  ProposeVersionInput,
+} from './services/version-proposal-service'
 
 export { fingerprintContent } from './util/fingerprint'
 
@@ -149,6 +162,8 @@ export { PostgresEvaluationRepository } from './infrastructure/postgres-reposito
 export { PostgresEvidenceRepository } from './infrastructure/postgres-repositories'
 export { PostgresFeedbackRepository } from './infrastructure/postgres-repositories'
 export { PostgresMemoryRepository } from './infrastructure/postgres-repositories'
+export { PostgresKnowledgeRepository } from './infrastructure/postgres-repositories'
+export { PostgresVersionProposalRepository } from './infrastructure/postgres-repositories'
 export { ScryptPasswordHasher } from './infrastructure/scrypt-password-hasher'
 export { HmacSessionCodec } from './infrastructure/session-codec'
 export { readMigrations, runMigrations } from './infrastructure/migrate'

@@ -11,9 +11,11 @@ import { EvidenceService } from './services/evidence-service'
 import { FeedbackService } from './services/feedback-service'
 import { FounderService } from './services/founder-service'
 import { IslandService } from './services/island-service'
+import { KnowledgeService } from './services/knowledge-service'
 import { MemoryService } from './services/memory-service'
 import { ProcessService } from './services/process-service'
 import { RunEngine } from './services/run-engine'
+import { VersionProposalService } from './services/version-proposal-service'
 import { WorkspaceService } from './services/workspace-service'
 import type { OpenClawCliConfig } from './openclaw/cli'
 import type { StructuredLlmPort } from './ports'
@@ -29,6 +31,8 @@ export interface AppServices {
   evidence: EvidenceService
   feedback: FeedbackService
   memory: MemoryService
+  knowledge: KnowledgeService
+  proposals: VersionProposalService
   openClaw?: OpenClawCliConfig
   pool: Pool
   close(): Promise<void>
@@ -97,6 +101,15 @@ export function createAppServices(config: AppServicesConfig): AppServices {
 
   const evidence = new EvidenceService({ evidence: repositories.evidence })
 
+  const knowledge = new KnowledgeService({ knowledge: repositories.knowledge })
+
+  const proposals = new VersionProposalService({
+    proposals: repositories.proposals,
+    knowledge,
+    processes,
+    islands,
+  })
+
   const runs = new RunEngine({
     runs: repositories.runs,
     approvals: repositories.approvals,
@@ -123,6 +136,8 @@ export function createAppServices(config: AppServicesConfig): AppServices {
     evidence,
     feedback,
     memory,
+    knowledge,
+    proposals,
     openClaw: config.openClaw,
     pool,
     async close() {

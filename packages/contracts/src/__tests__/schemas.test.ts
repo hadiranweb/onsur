@@ -354,6 +354,8 @@ describe('canonical contracts', () => {
     it('parses knowledge with evidence references', () => {
       const parsed = knowledgeSchema.parse({
         id: 'k-1',
+        workspaceId: 'ws-1',
+        ownerId: 'user-1',
         version: '1.0.0',
         status: 'published',
         title: 'known fix',

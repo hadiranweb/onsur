@@ -475,6 +475,46 @@ describe('postgres persistence (integration)', () => {
     })
     expect(bobPersonal.id).not.toBe(alicePersonal.id)
   })
+
+  it('runs knowledge governance: proposal approval produces a new version preserving the old', async () => {
+    const registered = await app.auth.register({
+      email: uniqueEmail(),
+      password: 'password123',
+      displayName: 'Gov Actor',
+    })
+    const personal = (await app.workspaces.getPersonalWorkspace(registered.user.id))!
+
+    const draft = await app.knowledge.createDraft({
+      workspaceId: personal.id,
+      ownerId: registered.user.id,
+      title: 'Retry guidance',
+      content: 'always retry with backoff',
+      evidenceRefs: [{ id: 'ev-1', kind: 'evidence' }],
+      actorUserId: registered.user.id,
+    })
+    await app.knowledge.publish(draft.id)
+
+    const proposal = await app.proposals.propose({
+      target: { id: draft.id, kind: 'knowledge' },
+      fromVersion: '1.0.0',
+      toVersion: '1.0.1',
+      rationale: 'new evidence',
+      content: 'always retry with exponential backoff',
+      evidenceRefs: [{ id: 'ev-2', kind: 'evidence' }],
+      actorUserId: registered.user.id,
+    })
+    await app.proposals.review(proposal.id)
+    await app.proposals.approve(proposal.id)
+    await app.proposals.merge(proposal.id, registered.user.id)
+
+    const versions = await app.knowledge.listVersions(draft.id)
+    expect(versions.map((entry) => entry.version).sort()).toEqual(['1.0.0', '1.0.1'])
+    expect(versions.find((entry) => entry.version === '1.0.0')!.status).toBe('superseded')
+    expect(versions.find((entry) => entry.version === '1.0.1')!.status).toBe('published')
+    expect(versions.find((entry) => entry.version === '1.0.1')!.content).toBe(
+      'always retry with exponential backoff',
+    )
+  })
 })
 
 async function waitForRunStatus(

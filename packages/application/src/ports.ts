@@ -7,6 +7,8 @@ import type {
   Feedback,
   Island,
   IslandStatus,
+  Knowledge,
+  KnowledgeStatus,
   MemoryEntry,
   MemoryScope,
   ProblemItem,
@@ -19,6 +21,8 @@ import type {
   SpsStatus,
   StructuredProblemOutput,
   ToolContract,
+  VersionProposal,
+  VersionProposalStatus,
   WorkspaceRole,
 } from '@element-plus/contracts'
 
@@ -402,6 +406,31 @@ export interface MemoryRepository {
   listByOwner(ownerId: string): Promise<MemoryRecord[]>
   listByWorkspace(workspaceId: string): Promise<MemoryRecord[]>
   listByScope(scope: MemoryScope): Promise<MemoryRecord[]>
+}
+
+// ---------------------------------------------------------------------------
+// Knowledge governance / VersionProposal (Sprint 08)
+// ---------------------------------------------------------------------------
+
+export type KnowledgeRecord = Knowledge & { createdAt: string }
+export type VersionProposalRecord = VersionProposal & { createdAt: string }
+
+export interface KnowledgeRepository {
+  create(input: Omit<KnowledgeRecord, 'createdAt'>): Promise<KnowledgeRecord>
+  findById(id: string): Promise<KnowledgeRecord | null>
+  findLatestById(id: string): Promise<KnowledgeRecord | null>
+  findVersion(id: string, version: string): Promise<KnowledgeRecord | null>
+  listByIdentity(id: string): Promise<KnowledgeRecord[]>
+  listByWorkspace(workspaceId: string): Promise<KnowledgeRecord[]>
+  updateStatus(id: string, version: string, status: KnowledgeStatus): Promise<void>
+}
+
+export interface VersionProposalRepository {
+  create(input: Omit<VersionProposalRecord, 'createdAt'>): Promise<VersionProposalRecord>
+  findById(id: string): Promise<VersionProposalRecord | null>
+  updateStatus(id: string, status: VersionProposalStatus): Promise<void>
+  listByTarget(targetId: string): Promise<VersionProposalRecord[]>
+  list(): Promise<VersionProposalRecord[]>
 }
 
 /** Registry of ToolContracts, resolved by id at run time. */

@@ -125,6 +125,7 @@ export type { MemoryEntry, MemoryScope, MemoryStatus } from './memory'
 export {
   knowledgeSchema,
   knowledgeStatusSchema,
+  knowledgeEventSchema,
   versionProposalSchema,
   versionProposalStatusSchema,
   versionProposalEventSchema,
@@ -132,6 +133,7 @@ export {
 export type {
   Knowledge,
   KnowledgeStatus,
+  KnowledgeEvent,
   VersionProposal,
   VersionProposalStatus,
   VersionProposalEvent,

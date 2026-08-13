@@ -78,11 +78,16 @@ export type { EvidenceQualityReport } from './rules/evidence'
 export { feedbackTransitions, canFeedbackTransition, nextFeedbackState } from './rules/feedback'
 
 export {
+  knowledgeTransitions,
+  canKnowledgeTransition,
+  nextKnowledgeState,
   versionProposalTransitions,
   canProposalTransition,
   nextProposalState,
   isForwardProposal,
   canMergeProposal,
+  isNextPatch,
+  validateKnowledge,
 } from './rules/knowledge'
 
 export { roleAtLeast, canAccessWorkspace, isWorkspaceOwner } from './rules/workspace'

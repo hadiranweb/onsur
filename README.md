@@ -18,9 +18,10 @@ versioned knowledge.
 - Sprint 04 (capability + process + island): **done**
 - Sprint 05 (run engine + fake runtime): **done**
 - Sprint 06 (OpenClaw adapter): **done**
-- Sprint 07 (evidence + feedback + memory): **in progress**
-- Sprint 08+ (knowledge governance, packages, marketplace, hardening): planned —
-  see the sprint roadmap below.
+- Sprint 07 (evidence + feedback + memory): **done**
+- Sprint 08 (knowledge governance + evolution): **in progress**
+- Sprint 09+ (package protocol, marketplace, hardening): planned — see the
+  sprint roadmap below.
 
 ## Architecture
 
@@ -134,8 +135,8 @@ environment validation and database connectivity honestly
 | 04     | Capability + process + island              | done    |
 | 05     | Run engine + fake runtime                  | done    |
 | 06     | OpenClaw adapter                           | done    |
-| 07     | Evidence + feedback + memory               | current |
-| 08     | Knowledge governance + evolution           | planned |
+| 07     | Evidence + feedback + memory               | done    |
+| 08     | Knowledge governance + evolution           | current |
 | 09     | Package protocol + outbox + connectors     | planned |
 | 10     | Controlled action island + mission control | planned |
 | 11     | Asset registry + marketplace               | planned |

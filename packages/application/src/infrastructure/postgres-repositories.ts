@@ -9,6 +9,7 @@ import type {
   Feedback,
   Island,
   IslandStatus,
+  KnowledgeStatus,
   MemoryEntry,
   MemoryScope,
   ProblemItem,
@@ -20,6 +21,7 @@ import type {
   RunSnapshot,
   RunStatus,
   SpsStatus,
+  VersionProposalStatus,
   WorkspaceRole,
 } from '@element-plus/contracts'
 import { compareVersions } from '@element-plus/domain'
@@ -38,6 +40,8 @@ import type {
   FeedbackRecord,
   FeedbackRepository,
   IslandRepository,
+  KnowledgeRecord,
+  KnowledgeRepository,
   MembershipRecord,
   MembershipRepository,
   MemoryRecord,
@@ -60,6 +64,8 @@ import type {
   ToolCallStatus,
   UserRecord,
   UserRepository,
+  VersionProposalRecord,
+  VersionProposalRepository,
   WorkspaceRecord,
   WorkspaceRepository,
 } from '../ports'
@@ -559,6 +565,8 @@ export interface PostgresRepositories {
   evidence: EvidenceRepository
   feedback: FeedbackRepository
   memory: MemoryRepository
+  knowledge: KnowledgeRepository
+  proposals: VersionProposalRepository
 }
 
 export function createPostgresRepositories(pool: Pool): PostgresRepositories {
@@ -582,6 +590,8 @@ export function createPostgresRepositories(pool: Pool): PostgresRepositories {
     evidence: new PostgresEvidenceRepository(pool),
     feedback: new PostgresFeedbackRepository(pool),
     memory: new PostgresMemoryRepository(pool),
+    knowledge: new PostgresKnowledgeRepository(pool),
+    proposals: new PostgresVersionProposalRepository(pool),
   }
 }
 
@@ -908,6 +918,36 @@ function mapMemory(row: Record<string, unknown>): MemoryRecord {
     tags: (row.tags as string[]) ?? [],
     sourceRun: (row.source_run as MemoryEntry['sourceRun']) ?? undefined,
     status: row.status as MemoryEntry['status'],
+    provenance: row.provenance as Provenance,
+    createdAt: toIso(row.created_at),
+  }
+}
+
+function mapKnowledge(row: Record<string, unknown>): KnowledgeRecord {
+  return {
+    id: row.id as string,
+    workspaceId: row.workspace_id as string,
+    ownerId: row.owner_id as string,
+    version: row.version as string,
+    status: row.status as KnowledgeStatus,
+    title: row.title as string,
+    content: row.content as string,
+    evidenceRefs: (row.evidence_refs as Reference[]) ?? [],
+    provenance: row.provenance as Provenance,
+    createdAt: toIso(row.created_at),
+  }
+}
+
+function mapProposal(row: Record<string, unknown>): VersionProposalRecord {
+  return {
+    id: row.id as string,
+    target: row.target as VersionProposalRecord['target'],
+    fromVersion: row.from_version as string,
+    toVersion: row.to_version as string,
+    rationale: row.rationale as string,
+    content: (row.content as string | null) ?? undefined,
+    evidenceRefs: (row.evidence_refs as Reference[]) ?? [],
+    status: row.status as VersionProposalStatus,
     provenance: row.provenance as Provenance,
     createdAt: toIso(row.created_at),
   }
@@ -1294,6 +1334,134 @@ export class PostgresMemoryRepository implements MemoryRepository {
       [scope],
     )
     return result.rows.map(mapMemory)
+  }
+}
+
+export class PostgresKnowledgeRepository implements KnowledgeRepository {
+  constructor(private readonly pool: Pool) {}
+
+  async create(input: Omit<KnowledgeRecord, 'createdAt'>): Promise<KnowledgeRecord> {
+    const result = await this.pool.query(
+      `INSERT INTO knowledge
+         (id, workspace_id, owner_id, version, status, title, content, evidence_refs, provenance)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+       RETURNING id, workspace_id, owner_id, version, status, title, content, evidence_refs, provenance, created_at`,
+      [
+        input.id,
+        input.workspaceId,
+        input.ownerId,
+        input.version,
+        input.status,
+        input.title,
+        input.content,
+        JSON.stringify(input.evidenceRefs),
+        JSON.stringify(input.provenance),
+      ],
+    )
+    return mapKnowledge(result.rows[0])
+  }
+
+  async findById(id: string): Promise<KnowledgeRecord | null> {
+    return this.findLatestById(id)
+  }
+
+  async findLatestById(id: string): Promise<KnowledgeRecord | null> {
+    const result = await this.pool.query(
+      `SELECT id, workspace_id, owner_id, version, status, title, content, evidence_refs, provenance, created_at
+         FROM knowledge WHERE id = $1`,
+      [id],
+    )
+    return maxVersion(result.rows.map(mapKnowledge))
+  }
+
+  async findVersion(id: string, version: string): Promise<KnowledgeRecord | null> {
+    const result = await this.pool.query(
+      `SELECT id, workspace_id, owner_id, version, status, title, content, evidence_refs, provenance, created_at
+         FROM knowledge WHERE id = $1 AND version = $2`,
+      [id, version],
+    )
+    return result.rows[0] ? mapKnowledge(result.rows[0]) : null
+  }
+
+  async listByIdentity(id: string): Promise<KnowledgeRecord[]> {
+    const result = await this.pool.query(
+      `SELECT id, workspace_id, owner_id, version, status, title, content, evidence_refs, provenance, created_at
+         FROM knowledge WHERE id = $1 ORDER BY version ASC`,
+      [id],
+    )
+    return result.rows.map(mapKnowledge)
+  }
+
+  async listByWorkspace(workspaceId: string): Promise<KnowledgeRecord[]> {
+    const result = await this.pool.query(
+      `SELECT id, workspace_id, owner_id, version, status, title, content, evidence_refs, provenance, created_at
+         FROM knowledge WHERE workspace_id = $1 ORDER BY created_at ASC`,
+      [workspaceId],
+    )
+    return result.rows.map(mapKnowledge)
+  }
+
+  async updateStatus(id: string, version: string, status: KnowledgeStatus): Promise<void> {
+    await this.pool.query(`UPDATE knowledge SET status = $3 WHERE id = $1 AND version = $2`, [
+      id,
+      version,
+      status,
+    ])
+  }
+}
+
+export class PostgresVersionProposalRepository implements VersionProposalRepository {
+  constructor(private readonly pool: Pool) {}
+
+  async create(input: Omit<VersionProposalRecord, 'createdAt'>): Promise<VersionProposalRecord> {
+    const result = await this.pool.query(
+      `INSERT INTO version_proposals
+         (id, target, from_version, to_version, rationale, content, evidence_refs, status, provenance)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+       RETURNING id, target, from_version, to_version, rationale, content, evidence_refs, status, provenance, created_at`,
+      [
+        input.id,
+        JSON.stringify(input.target),
+        input.fromVersion,
+        input.toVersion,
+        input.rationale,
+        input.content ?? null,
+        JSON.stringify(input.evidenceRefs),
+        input.status,
+        JSON.stringify(input.provenance),
+      ],
+    )
+    return mapProposal(result.rows[0])
+  }
+
+  async findById(id: string): Promise<VersionProposalRecord | null> {
+    const result = await this.pool.query(
+      `SELECT id, target, from_version, to_version, rationale, content, evidence_refs, status, provenance, created_at
+         FROM version_proposals WHERE id = $1`,
+      [id],
+    )
+    return result.rows[0] ? mapProposal(result.rows[0]) : null
+  }
+
+  async updateStatus(id: string, status: VersionProposalStatus): Promise<void> {
+    await this.pool.query(`UPDATE version_proposals SET status = $2 WHERE id = $1`, [id, status])
+  }
+
+  async listByTarget(targetId: string): Promise<VersionProposalRecord[]> {
+    const result = await this.pool.query(
+      `SELECT id, target, from_version, to_version, rationale, content, evidence_refs, status, provenance, created_at
+         FROM version_proposals WHERE target->>'id' = $1 ORDER BY created_at ASC`,
+      [targetId],
+    )
+    return result.rows.map(mapProposal)
+  }
+
+  async list(): Promise<VersionProposalRecord[]> {
+    const result = await this.pool.query(
+      `SELECT id, target, from_version, to_version, rationale, content, evidence_refs, status, provenance, created_at
+         FROM version_proposals ORDER BY created_at DESC`,
+    )
+    return result.rows.map(mapProposal)
   }
 }
 
