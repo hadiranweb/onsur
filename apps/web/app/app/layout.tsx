@@ -23,6 +23,8 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
           <Link href="/app/memory">Memory</Link>
           <Link href="/app/knowledge">Knowledge</Link>
           <Link href="/app/connections">Connections</Link>
+          <Link href="/app/marketplace">Marketplace</Link>
+          <Link href="/app/assets">My Assets</Link>
           <span className="shell__user">{user.displayName}</span>
           <form action="/api/auth/logout" method="post">
             <button type="submit">Log out</button>

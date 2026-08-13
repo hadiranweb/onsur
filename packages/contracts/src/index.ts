@@ -149,8 +149,8 @@ export type {
   VersionProposalEvent,
 } from './knowledge'
 
-export { assetSchema, assetKindSchema, assetVisibilitySchema } from './asset'
-export type { Asset, AssetKind, AssetVisibility } from './asset'
+export { assetSchema, assetKindSchema, assetVisibilitySchema, assetInstallSchema } from './asset'
+export type { Asset, AssetKind, AssetVisibility, AssetInstall } from './asset'
 
 export { auditEventSchema, auditOutcomeSchema } from './audit'
 export type { AuditEvent, AuditOutcome } from './audit'

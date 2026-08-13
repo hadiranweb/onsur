@@ -31,6 +31,10 @@ import type {
   ApprovalRepository,
   ArtifactRecord,
   ArtifactRepository,
+  AssetInstallRecord,
+  AssetInstallRepository,
+  AssetRecord,
+  AssetRepository,
   CapabilityRepository,
   EffectRecordRow,
   EffectRepository,
@@ -567,6 +571,8 @@ export interface PostgresRepositories {
   memory: MemoryRepository
   knowledge: KnowledgeRepository
   proposals: VersionProposalRepository
+  assets: AssetRepository
+  assetInstalls: AssetInstallRepository
 }
 
 export function createPostgresRepositories(pool: Pool): PostgresRepositories {
@@ -592,6 +598,8 @@ export function createPostgresRepositories(pool: Pool): PostgresRepositories {
     memory: new PostgresMemoryRepository(pool),
     knowledge: new PostgresKnowledgeRepository(pool),
     proposals: new PostgresVersionProposalRepository(pool),
+    assets: new PostgresAssetRepository(pool),
+    assetInstalls: new PostgresAssetInstallRepository(pool),
   }
 }
 
@@ -948,6 +956,36 @@ function mapProposal(row: Record<string, unknown>): VersionProposalRecord {
     content: (row.content as string | null) ?? undefined,
     evidenceRefs: (row.evidence_refs as Reference[]) ?? [],
     status: row.status as VersionProposalStatus,
+    provenance: row.provenance as Provenance,
+    createdAt: toIso(row.created_at),
+  }
+}
+
+function mapAsset(row: Record<string, unknown>): AssetRecord {
+  return {
+    id: row.id as string,
+    version: row.version as string,
+    kind: row.kind as AssetRecord['kind'],
+    name: row.name as string,
+    description: row.description as string,
+    tags: (row.tags as string[]) ?? [],
+    owner: row.owner as AssetRecord['owner'],
+    visibility: row.visibility as AssetRecord['visibility'],
+    license: row.license as string,
+    contentRef: row.content_ref as AssetRecord['contentRef'],
+    rights: (row.rights as Record<string, string> | null) ?? undefined,
+    provenance: row.provenance as Provenance,
+    createdAt: toIso(row.created_at),
+  }
+}
+
+function mapAssetInstall(row: Record<string, unknown>): AssetInstallRecord {
+  return {
+    id: row.id as string,
+    assetId: row.asset_id as string,
+    version: row.version as string,
+    workspaceId: row.workspace_id as string,
+    installedBy: row.installed_by as string,
     provenance: row.provenance as Provenance,
     createdAt: toIso(row.created_at),
   }
@@ -1473,6 +1511,142 @@ function maxVersion<T extends { version: string }>(records: T[]): T | null {
   return records.reduce((max, record) =>
     compareVersions(record.version, max.version) > 0 ? record : max,
   )
+}
+
+const ASSET_COLUMNS =
+  'id, version, kind, name, description, tags, owner, visibility, license, content_ref, rights, provenance'
+
+export class PostgresAssetRepository implements AssetRepository {
+  constructor(private readonly pool: Pool) {}
+
+  async create(input: Omit<AssetRecord, 'createdAt'>): Promise<AssetRecord> {
+    const result = await this.pool.query(
+      `INSERT INTO assets
+         (id, version, kind, name, description, tags, owner, visibility, license, content_ref, rights, provenance)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+       RETURNING ${ASSET_COLUMNS}, created_at`,
+      [
+        input.id,
+        input.version,
+        input.kind,
+        input.name,
+        input.description,
+        JSON.stringify(input.tags),
+        JSON.stringify(input.owner),
+        input.visibility,
+        input.license,
+        JSON.stringify(input.contentRef),
+        input.rights ? JSON.stringify(input.rights) : null,
+        JSON.stringify(input.provenance),
+      ],
+    )
+    return mapAsset(result.rows[0])
+  }
+
+  async findById(id: string): Promise<AssetRecord | null> {
+    return this.findLatestById(id)
+  }
+
+  async findLatestById(id: string): Promise<AssetRecord | null> {
+    const result = await this.pool.query(
+      `SELECT ${ASSET_COLUMNS}, created_at FROM assets WHERE id = $1`,
+      [id],
+    )
+    return maxVersion(result.rows.map(mapAsset))
+  }
+
+  async findVersion(id: string, version: string): Promise<AssetRecord | null> {
+    const result = await this.pool.query(
+      `SELECT ${ASSET_COLUMNS}, created_at FROM assets WHERE id = $1 AND version = $2`,
+      [id, version],
+    )
+    return result.rows[0] ? mapAsset(result.rows[0]) : null
+  }
+
+  async listByIdentity(id: string): Promise<AssetRecord[]> {
+    const result = await this.pool.query(
+      `SELECT ${ASSET_COLUMNS}, created_at FROM assets WHERE id = $1 ORDER BY version ASC`,
+      [id],
+    )
+    return result.rows.map(mapAsset)
+  }
+
+  async listByOwner(ownerId: string): Promise<AssetRecord[]> {
+    const result = await this.pool.query(
+      `SELECT ${ASSET_COLUMNS}, created_at FROM assets WHERE owner->>'id' = $1 ORDER BY created_at DESC`,
+      [ownerId],
+    )
+    return result.rows.map(mapAsset)
+  }
+
+  async listPublic(): Promise<AssetRecord[]> {
+    const result = await this.pool.query(
+      `SELECT ${ASSET_COLUMNS}, created_at FROM assets WHERE visibility = 'public' ORDER BY created_at DESC`,
+    )
+    return result.rows.map(mapAsset)
+  }
+
+  async list(): Promise<AssetRecord[]> {
+    const result = await this.pool.query(
+      `SELECT ${ASSET_COLUMNS}, created_at FROM assets ORDER BY created_at DESC`,
+    )
+    return result.rows.map(mapAsset)
+  }
+
+  async updateVisibility(
+    id: string,
+    version: string,
+    visibility: AssetRecord['visibility'],
+  ): Promise<void> {
+    await this.pool.query(`UPDATE assets SET visibility = $3 WHERE id = $1 AND version = $2`, [
+      id,
+      version,
+      visibility,
+    ])
+  }
+}
+
+export class PostgresAssetInstallRepository implements AssetInstallRepository {
+  constructor(private readonly pool: Pool) {}
+
+  async create(input: Omit<AssetInstallRecord, 'createdAt'>): Promise<AssetInstallRecord> {
+    const result = await this.pool.query(
+      `INSERT INTO asset_installs (id, asset_id, version, workspace_id, installed_by, provenance)
+       VALUES ($1, $2, $3, $4, $5, $6)
+       RETURNING id, asset_id, version, workspace_id, installed_by, provenance, created_at`,
+      [
+        input.id,
+        input.assetId,
+        input.version,
+        input.workspaceId,
+        input.installedBy,
+        JSON.stringify(input.provenance),
+      ],
+    )
+    return mapAssetInstall(result.rows[0])
+  }
+
+  async listByWorkspace(workspaceId: string): Promise<AssetInstallRecord[]> {
+    const result = await this.pool.query(
+      `SELECT id, asset_id, version, workspace_id, installed_by, provenance, created_at
+         FROM asset_installs WHERE workspace_id = $1 ORDER BY created_at ASC`,
+      [workspaceId],
+    )
+    return result.rows.map(mapAssetInstall)
+  }
+
+  async findByAssetVersion(
+    assetId: string,
+    version: string,
+    workspaceId: string,
+  ): Promise<AssetInstallRecord | null> {
+    const result = await this.pool.query(
+      `SELECT id, asset_id, version, workspace_id, installed_by, provenance, created_at
+         FROM asset_installs WHERE asset_id = $1 AND version = $2 AND workspace_id = $3`,
+      [assetId, version, workspaceId],
+    )
+    return result.rows[0] ? mapAssetInstall(result.rows[0]) : null
+  }
 }
 
 function isUniqueViolation(error: unknown): boolean {

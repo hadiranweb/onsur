@@ -20,6 +20,10 @@ import type {
   ApprovalRepository,
   ArtifactRecord,
   ArtifactRepository,
+  AssetInstallRecord,
+  AssetInstallRepository,
+  AssetRecord,
+  AssetRepository,
   CapabilityRepository,
   EffectRecordRow,
   EffectRepository,
@@ -829,6 +833,92 @@ export class InMemoryVersionProposalRepository implements VersionProposalReposit
   }
 
   async list(): Promise<VersionProposalRecord[]> {
+    return [...this.byId.values()]
+  }
+}
+
+export class InMemoryAssetRepository implements AssetRepository {
+  private readonly byKey = new Map<string, AssetRecord>()
+
+  async create(input: Omit<AssetRecord, 'createdAt'>): Promise<AssetRecord> {
+    const record: AssetRecord = { ...input, createdAt: new Date().toISOString() }
+    this.byKey.set(`${record.id}::${record.version}`, record)
+    return record
+  }
+
+  async findById(id: string): Promise<AssetRecord | null> {
+    return this.findLatestById(id)
+  }
+
+  async findLatestById(id: string): Promise<AssetRecord | null> {
+    return maxVersion([...this.byKey.values()].filter((asset) => asset.id === id))
+  }
+
+  async findVersion(id: string, version: string): Promise<AssetRecord | null> {
+    return this.byKey.get(`${id}::${version}`) ?? null
+  }
+
+  async listByIdentity(id: string): Promise<AssetRecord[]> {
+    return [...this.byKey.values()].filter((asset) => asset.id === id)
+  }
+
+  async listByOwner(ownerId: string): Promise<AssetRecord[]> {
+    return [...this.byKey.values()].filter((asset) => asset.owner.id === ownerId)
+  }
+
+  async listPublic(): Promise<AssetRecord[]> {
+    return [...this.byKey.values()].filter((asset) => asset.visibility === 'public')
+  }
+
+  async list(): Promise<AssetRecord[]> {
+    return [...this.byKey.values()]
+  }
+
+  async updateVisibility(
+    id: string,
+    version: string,
+    visibility: AssetRecord['visibility'],
+  ): Promise<void> {
+    const record = this.byKey.get(`${id}::${version}`)
+    if (record) record.visibility = visibility
+  }
+
+  all(): AssetRecord[] {
+    return [...this.byKey.values()]
+  }
+}
+
+export class InMemoryAssetInstallRepository implements AssetInstallRepository {
+  private readonly byId = new Map<string, AssetInstallRecord>()
+
+  async create(input: Omit<AssetInstallRecord, 'createdAt'>): Promise<AssetInstallRecord> {
+    const record: AssetInstallRecord = { ...input, createdAt: new Date().toISOString() }
+    this.byId.set(record.id, record)
+    return record
+  }
+
+  async listByWorkspace(workspaceId: string): Promise<AssetInstallRecord[]> {
+    return [...this.byId.values()].filter((install) => install.workspaceId === workspaceId)
+  }
+
+  async findByAssetVersion(
+    assetId: string,
+    version: string,
+    workspaceId: string,
+  ): Promise<AssetInstallRecord | null> {
+    for (const install of this.byId.values()) {
+      if (
+        install.assetId === assetId &&
+        install.version === version &&
+        install.workspaceId === workspaceId
+      ) {
+        return install
+      }
+    }
+    return null
+  }
+
+  all(): AssetInstallRecord[] {
     return [...this.byId.values()]
   }
 }

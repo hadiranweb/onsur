@@ -387,6 +387,8 @@ describe('canonical contracts', () => {
         id: 'asset-1',
         kind: 'island',
         version: '1.0.0',
+        name: 'My Island Asset',
+        description: 'a reusable island asset',
         owner: ref('user-1', 'user'),
         visibility: 'public',
         license: 'MIT',

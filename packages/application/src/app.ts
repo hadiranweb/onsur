@@ -5,6 +5,7 @@ import { FakeStructuredLlm } from './infrastructure/fake-structured-llm'
 import { InMemoryToolRegistry } from './infrastructure/tool-registry'
 import { ScryptPasswordHasher } from './infrastructure/scrypt-password-hasher'
 import { HmacSessionCodec } from './infrastructure/session-codec'
+import { AssetService } from './services/asset-service'
 import { AuthService } from './services/auth-service'
 import { CapabilityService } from './services/capability-service'
 import { EvidenceService } from './services/evidence-service'
@@ -41,6 +42,7 @@ export interface AppServices {
   knowledge: KnowledgeService
   proposals: VersionProposalService
   packages: PackageService
+  assets: AssetService
   openClaw?: OpenClawCliConfig
   pool: Pool
   close(): Promise<void>
@@ -125,6 +127,12 @@ export function createAppServices(config: AppServicesConfig): AppServices {
     connectors: [new RelayConnector(pool)],
   })
 
+  const assets = new AssetService({
+    assets: repositories.assets,
+    installs: repositories.assetInstalls,
+    workspaces,
+  })
+
   const runs = new RunEngine({
     runs: repositories.runs,
     approvals: repositories.approvals,
@@ -154,6 +162,7 @@ export function createAppServices(config: AppServicesConfig): AppServices {
     knowledge,
     proposals,
     packages,
+    assets,
     openClaw: config.openClaw,
     pool,
     async close() {

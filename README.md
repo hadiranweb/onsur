@@ -21,8 +21,9 @@ versioned knowledge.
 - Sprint 07 (evidence + feedback + memory): **done**
 - Sprint 08 (knowledge governance + evolution): **done**
 - Sprint 09 (package protocol + outbox + connectors): **done**
-- Sprint 10 (controlled action island + mission control): **in progress**
-- Sprint 11+ (asset registry/marketplace, hardening): planned — see the sprint
+- Sprint 10 (controlled action island + mission control): **done**
+- Sprint 11 (asset registry + marketplace): **in progress**
+- Sprint 12 (v1 hardening + complete vertical proof): planned — see the sprint
   roadmap below.
 
 ## Architecture
@@ -140,8 +141,8 @@ environment validation and database connectivity honestly
 | 07     | Evidence + feedback + memory               | done    |
 | 08     | Knowledge governance + evolution           | done    |
 | 09     | Package protocol + outbox + connectors     | done    |
-| 10     | Controlled action island + mission control | current |
-| 11     | Asset registry + marketplace               | planned |
+| 10     | Controlled action island + mission control | done    |
+| 11     | Asset registry + marketplace               | current |
 | 12     | v1 hardening + complete vertical proof     | planned |
 
 ## License

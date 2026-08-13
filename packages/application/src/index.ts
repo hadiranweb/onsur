@@ -67,6 +67,10 @@ export type {
   Connector,
   PackageEventRecord,
   PackageEventRepository,
+  AssetRecord,
+  AssetRepository,
+  AssetInstallRecord,
+  AssetInstallRepository,
 } from './ports'
 
 export { AuthService, SESSION_COOKIE_NAME, SESSION_TTL_MS } from './services/auth-service'
@@ -125,12 +129,20 @@ export type {
 export { PackageService } from './services/package-service'
 export type { PackageServiceDeps, PublishPackageInput } from './services/package-service'
 
+export { AssetService } from './services/asset-service'
+export type { AssetServiceDeps, RegisterAssetInput, ForkResult } from './services/asset-service'
+
 export {
   PgOutboxRepository,
   PgPackageEventRepository,
   PgTransactionRunner,
 } from './infrastructure/outbox'
 export { RelayConnector } from './infrastructure/relay-connector'
+
+export {
+  PostgresAssetRepository,
+  PostgresAssetInstallRepository,
+} from './infrastructure/postgres-repositories'
 
 export { fingerprintContent } from './util/fingerprint'
 

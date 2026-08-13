@@ -613,6 +613,74 @@ describe('postgres persistence (integration)', () => {
     expect(view.approvals[0]!.status).toBe('approved')
     expect(view.events.map((event) => event.type)).toContain('approve')
   })
+
+  it('registers, publishes, installs, and forks an asset through real persistence', async () => {
+    const alice = await app.auth.register({
+      email: uniqueEmail(),
+      password: 'password123',
+      displayName: 'Alice Asset',
+    })
+    const bob = await app.auth.register({
+      email: uniqueEmail(),
+      password: 'password123',
+      displayName: 'Bob Asset',
+    })
+    const alicePersonal = (await app.workspaces.getPersonalWorkspace(alice.user.id))!
+    const bobPersonal = (await app.workspaces.getPersonalWorkspace(bob.user.id))!
+
+    const asset = await app.assets.register({
+      kind: 'island',
+      name: 'Reusable Island',
+      description: 'a reusable island asset',
+      tags: ['island', 'reusable'],
+      license: 'MIT',
+      contentRef: { id: 'isl-1', kind: 'island' },
+      actorUserId: alice.user.id,
+    })
+    expect(asset.visibility).toBe('private')
+
+    await app.assets.publish(asset.id, alice.user.id)
+    expect((await app.assets.get(asset.id)).visibility).toBe('public')
+
+    // Alice installs the exact version in her workspace.
+    const install = await app.assets.install(asset.id, '1.0.0', alicePersonal.id, alice.user.id)
+    expect(install.version).toBe('1.0.0')
+
+    // Bob (a different owner) can now fork the public asset.
+    const fork = await app.assets.fork(asset.id, bob.user.id)
+    expect(fork.asset.id).not.toBe(asset.id)
+    expect(fork.asset.owner.id).toBe(bob.user.id)
+    expect(fork.asset.provenance.derivedFrom).toContainEqual({ id: asset.id, kind: 'asset' })
+
+    // Bob can install the public original into his workspace.
+    await app.assets.install(asset.id, '1.0.0', bobPersonal.id, bob.user.id)
+
+    // Public catalog contains the asset.
+    const publicAssets = await app.assets.listPublic()
+    expect(publicAssets.map((entry) => entry.id)).toContain(asset.id)
+  })
+
+  it('refuses to publish a dataset publicly without rights metadata through real persistence', async () => {
+    const user = (
+      await app.auth.register({
+        email: uniqueEmail(),
+        password: 'password123',
+        displayName: 'Dataset Owner',
+      })
+    ).user
+
+    const dataset = await app.assets.register({
+      kind: 'dataset',
+      name: 'Raw Dataset',
+      description: 'private dataset',
+      license: 'MIT',
+      contentRef: { id: 'ds-1', kind: 'asset' },
+      actorUserId: user.id,
+    })
+    await expect(app.assets.publish(dataset.id, user.id)).rejects.toMatchObject({
+      code: 'INVALID_INPUT',
+    })
+  })
 })
 
 async function waitForRunStatus(

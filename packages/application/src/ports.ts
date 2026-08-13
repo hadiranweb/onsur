@@ -1,5 +1,8 @@
 import type {
   ArtifactKind,
+  Asset,
+  AssetInstall,
+  AssetVisibility,
   Capability,
   ConnectorStatus,
   EffectKind,
@@ -505,6 +508,35 @@ export interface PackageEventRepository {
     input: Omit<PackageEventRecord, 'createdAt'>,
   ): Promise<void>
   list(): Promise<PackageEventRecord[]>
+}
+
+// ---------------------------------------------------------------------------
+// Asset Registry / Marketplace (Sprint 11)
+// ---------------------------------------------------------------------------
+
+export type AssetRecord = Asset & { createdAt: string }
+export type AssetInstallRecord = AssetInstall & { createdAt: string }
+
+export interface AssetRepository {
+  create(input: Omit<AssetRecord, 'createdAt'>): Promise<AssetRecord>
+  findById(id: string): Promise<AssetRecord | null>
+  findLatestById(id: string): Promise<AssetRecord | null>
+  findVersion(id: string, version: string): Promise<AssetRecord | null>
+  listByIdentity(id: string): Promise<AssetRecord[]>
+  listByOwner(ownerId: string): Promise<AssetRecord[]>
+  listPublic(): Promise<AssetRecord[]>
+  list(): Promise<AssetRecord[]>
+  updateVisibility(id: string, version: string, visibility: AssetVisibility): Promise<void>
+}
+
+export interface AssetInstallRepository {
+  create(input: Omit<AssetInstallRecord, 'createdAt'>): Promise<AssetInstallRecord>
+  listByWorkspace(workspaceId: string): Promise<AssetInstallRecord[]>
+  findByAssetVersion(
+    assetId: string,
+    version: string,
+    workspaceId: string,
+  ): Promise<AssetInstallRecord | null>
 }
 
 /** Registry of ToolContracts, resolved by id at run time. */

@@ -103,3 +103,6 @@ export { requiresApproval, isToolExecutionAuthorized } from './rules/authority'
 export { canWriteMemory, canReadMemory } from './rules/memory'
 
 export { validatePackageCorrelation, correlationSurvives, deliveryKey } from './rules/package'
+
+export { canPublishAsset, forkProvenanceDerivesFrom, installsExactVersion } from './rules/asset'
+export type { AssetPublicationReport } from './rules/asset'
