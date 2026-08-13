@@ -460,6 +460,70 @@ describe('parseFakeScript', () => {
   })
 })
 
+describe('run recovery', () => {
+  it('marks a stale queued run as cancelled', async () => {
+    const h = build()
+    await h.islands.createDraft({
+      manifest: {
+        name: activeIsland().name,
+        description: activeIsland().description,
+        capabilities: activeIsland().capabilities,
+        runtime: activeIsland().runtime,
+        permissions: [],
+      },
+      actorUserId: 'user-1',
+      id: 'isl-1',
+    })
+    await h.islands.activate('isl-1')
+    await h.specs.create(confirmedSpec())
+
+    const run = await h.engine.enqueue({
+      actorUserId: 'user-1',
+      islandId: 'isl-1',
+      problemSpecId: 'ps-1',
+    })
+    // Wait for terminal then artificially revert status to simulate a crash.
+    await waitForStatus(h.engine, run.id, ['completed'])
+    const record = (await h.runs.findById(run.id))!
+    record.status = 'queued'
+    record.updatedAt = '2026-08-01T00:00:00.000Z' // far in the past
+
+    const recovered = await h.engine.recoverStaleRuns({ staleAfterMs: 1000 })
+    expect(recovered).toBe(1)
+    expect((await h.runs.findById(run.id))!.status).toBe('cancelled')
+  })
+
+  it('does not recover a fresh non-terminal run', async () => {
+    const h = build()
+    await h.islands.createDraft({
+      manifest: {
+        name: activeIsland().name,
+        description: activeIsland().description,
+        capabilities: activeIsland().capabilities,
+        runtime: activeIsland().runtime,
+        permissions: [],
+      },
+      actorUserId: 'user-1',
+      id: 'isl-1',
+    })
+    await h.islands.activate('isl-1')
+    await h.specs.create(confirmedSpec())
+    const run = await h.engine.enqueue({
+      actorUserId: 'user-1',
+      islandId: 'isl-1',
+      problemSpecId: 'ps-1',
+    })
+    await waitForStatus(h.engine, run.id, ['completed'])
+    const record = (await h.runs.findById(run.id))!
+    record.status = 'queued'
+    record.updatedAt = new Date().toISOString() // fresh
+
+    const recovered = await h.engine.recoverStaleRuns({ staleAfterMs: 60_000 })
+    expect(recovered).toBe(0)
+    expect((await h.runs.findById(run.id))!.status).toBe('queued')
+  })
+})
+
 describe('error normalization', () => {
   it('passes through a RuntimeError shape', () => {
     expect(normalizeError({ code: 'RUNTIME_ERROR', message: 'boom' })).toEqual({

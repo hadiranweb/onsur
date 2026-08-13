@@ -16,7 +16,8 @@
     "build": "tsc --noEmit",
     "test": "vitest run",
     "db:start": "node scripts/start-db.mjs",
-    "db:migrate": "node scripts/migrate.mjs"
+    "db:migrate": "node scripts/migrate.mjs",
+    "e2e:vertical": "node scripts/e2e-vertical.mjs"
   },
   "dependencies": {
     "@element-plus/contracts": "workspace:*",

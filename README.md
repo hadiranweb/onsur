@@ -22,9 +22,9 @@ versioned knowledge.
 - Sprint 08 (knowledge governance + evolution): **done**
 - Sprint 09 (package protocol + outbox + connectors): **done**
 - Sprint 10 (controlled action island + mission control): **done**
-- Sprint 11 (asset registry + marketplace): **in progress**
-- Sprint 12 (v1 hardening + complete vertical proof): planned — see the sprint
-  roadmap below.
+- Sprint 11 (asset registry + marketplace): **done**
+- Sprint 12 (v1 hardening + complete vertical proof): **in progress** — see the
+  sprint roadmap below.
 
 ## Architecture
 
@@ -114,10 +114,12 @@ pnpm typecheck
 pnpm test
 pnpm build
 pnpm check:arch
+pnpm e2e:vertical   # HTTP-level vertical E2E (after `pnpm build`)
 ```
 
-Integration tests (`packages/application/src/__tests__/postgres.integration.test.ts`)
-boot their own in-process PostgreSQL and run automatically as part of
+Integration tests (`packages/application/src/__tests__/postgres.integration.test.ts`
+and `vertical-e2e.test.ts`) boot their own in-process PostgreSQL and run
+automatically as part of
 `pnpm test`; no external database is required.
 
 ## Environment
@@ -142,8 +144,8 @@ environment validation and database connectivity honestly
 | 08     | Knowledge governance + evolution           | done    |
 | 09     | Package protocol + outbox + connectors     | done    |
 | 10     | Controlled action island + mission control | done    |
-| 11     | Asset registry + marketplace               | current |
-| 12     | v1 hardening + complete vertical proof     | planned |
+| 11     | Asset registry + marketplace               | done    |
+| 12     | v1 hardening + complete vertical proof     | current |
 
 ## License
 

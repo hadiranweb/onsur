@@ -212,6 +212,46 @@ export class RunEngine {
     return result
   }
 
+  /**
+   * Run recovery: mark stale non-terminal runs as terminal after a process
+   * crash or scheduler outage. Queued/awaiting runs are cancelled; running
+   * runs are failed. Pending approvals are rejected so nothing executes later.
+   */
+  async recoverStaleRuns(options: { staleAfterMs?: number } = {}): Promise<number> {
+    const staleAfterMs = options.staleAfterMs ?? 30 * 60 * 1000
+    const runs = await this.deps.runs.list()
+    let recovered = 0
+    for (const run of runs) {
+      if (
+        run.status !== 'queued' &&
+        run.status !== 'running' &&
+        run.status !== 'awaiting_approval'
+      ) {
+        continue
+      }
+      const updatedAt = new Date(run.updatedAt).getTime()
+      if (this.now().getTime() - updatedAt <= staleAfterMs) {
+        continue
+      }
+
+      const pendingApprovals = (await this.deps.approvals.listByRun(run.id)).filter(
+        (approval) => approval.status === 'pending',
+      )
+      for (const approval of pendingApprovals) {
+        await this.deps.approvals.decide(approval.id, 'rejected', 'system')
+        await this.deps.toolCalls.updateStatus(approval.toolCallId, 'rejected')
+      }
+
+      const event = run.status === 'running' ? 'fail' : 'cancel'
+      await this.appendEvent(run.id, event, {
+        error: { code: 'RECOVERY', message: 'run recovered after stale timeout' },
+      })
+      await this.transition(run.id, event)
+      recovered += 1
+    }
+    return recovered
+  }
+
   /** Approve or reject a pending approval (default deny: only `approve` grants). */
   async decideApproval(
     user: { id: string },

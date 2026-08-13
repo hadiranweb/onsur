@@ -146,6 +146,8 @@ export {
 
 export { fingerprintContent } from './util/fingerprint'
 
+export { logger } from './util/logger'
+
 export { FakeRuntimeAdapter } from './infrastructure/fake-runtime-adapter'
 export type {
   FakeRuntimeAdapterOptions,
