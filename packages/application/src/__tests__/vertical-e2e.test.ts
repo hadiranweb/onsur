@@ -53,12 +53,13 @@ afterAll(async () => {
 async function waitForRunStatus(
   runId: string,
   statuses: string[],
+  userId: string,
   timeoutMs = 5000,
 ): Promise<RunView> {
   const start = Date.now()
   let view: RunView
   do {
-    view = await app.runs.get(runId)
+    view = await app.runs.get({ id: userId }, runId)
     if (statuses.includes(view.run.status)) return view
     await new Promise((resolve) => setTimeout(resolve, 10))
   } while (Date.now() - start < timeoutMs)
@@ -119,7 +120,7 @@ describe('Element Plus vertical proof', () => {
       problemSpecId: specId,
       processId: process.id,
     })
-    const runView = await waitForRunStatus(run.id, ['completed'])
+    const runView = await waitForRunStatus(run.id, ['completed'], alice.user.id)
     expect(runView.run.status).toBe('completed')
     expect(runView.artifacts).toHaveLength(1)
 
@@ -217,11 +218,11 @@ describe('Element Plus vertical proof', () => {
       problemSpecId: confirmed.confirmed!.id,
     })
 
-    const paused = await waitForRunStatus(run.id, ['awaiting_approval'])
+    const paused = await waitForRunStatus(run.id, ['awaiting_approval'], user.user.id)
     expect(paused.approvals[0]!.effectKind).toBe('external_reversible')
 
     await app.runs.decideApproval({ id: user.user.id }, run.id, paused.approvals[0]!.id, 'approve')
-    const done = await waitForRunStatus(run.id, ['completed'])
+    const done = await waitForRunStatus(run.id, ['completed'], user.user.id)
     expect(done.effects).toHaveLength(1)
     expect(done.effects[0]!.kind).toBe('external_reversible')
   })

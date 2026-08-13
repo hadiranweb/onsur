@@ -39,6 +39,7 @@ import { makeProvenance } from '../util/provenance'
 import { normalizeError } from '../util/normalize-error'
 import type { IslandService } from './island-service'
 import type { ProcessService } from './process-service'
+import type { ResourceAccessService } from './resource-access-service'
 
 export interface EnqueueRunInput {
   actorUserId: string
@@ -76,6 +77,7 @@ export interface RunEngineDeps {
   registry: ToolRegistry
   islands: IslandService
   processes: ProcessService
+  access: ResourceAccessService
   now?: () => Date
   runtimeFactory?: (island: Island, gate: ToolGate) => RuntimeAdapter
   openClawConfig?: OpenClawCliConfig
@@ -101,17 +103,29 @@ export class RunEngine {
 
   /** Create a Run (draft → queued) and schedule background execution. */
   async enqueue(input: EnqueueRunInput): Promise<RunRecord> {
-    const island = await this.deps.islands.get(input.islandId)
-    if (island.status !== 'active') {
-      throw new AppError('INVALID_INPUT', `island ${island.id} is not active`)
-    }
-
     const problemSpec = await this.deps.specifications.findById(input.problemSpecId)
     if (!problemSpec) {
       throw new AppError('NOT_FOUND', `problem specification ${input.problemSpecId} not found`)
     }
     if (problemSpec.status !== 'confirmed') {
       throw new AppError('INVALID_INPUT', 'problem specification must be confirmed')
+    }
+
+    // The Run's execution workspace is the ProblemSpecification's owning
+    // workspace (v1 local rule). Authority resolves through the reusable
+    // boundary: actor membership in the workspace + an explicit subject
+    // relationship. No relationship → DENY (no run, no job, no dispatch).
+    const workspaceId = problemSpec.workspaceId
+    await this.deps.access.assertCanAccessSubject(
+      input.actorUserId,
+      workspaceId,
+      { id: problemSpec.id, kind: 'problem_specification' },
+      'execute',
+    )
+
+    const island = await this.deps.islands.get(input.islandId)
+    if (island.status !== 'active') {
+      throw new AppError('INVALID_INPUT', `island ${island.id} is not active`)
     }
 
     const process = input.processId ? await this.deps.processes.get(input.processId) : null
@@ -133,6 +147,7 @@ export class RunEngine {
 
     const run = await this.deps.runs.create({
       id: randomUUID(),
+      workspaceId,
       status: 'draft',
       snapshot,
       provenance: makeProvenance({
@@ -153,8 +168,8 @@ export class RunEngine {
   }
 
   /** The full, authorized view of a run (timeline, approvals, effects, ...). */
-  async get(runId: string): Promise<RunView> {
-    const run = await this.mustRun(runId)
+  async get(user: { id: string }, runId: string): Promise<RunView> {
+    await this.deps.access.assertCanAccessRun(user.id, runId, 'read')
     const [events, approvals, toolCalls, effects, artifacts, evaluations] = await Promise.all([
       this.deps.runs.listEvents(runId),
       this.deps.approvals.listByRun(runId),
@@ -163,16 +178,23 @@ export class RunEngine {
       this.deps.artifacts.listByRun(runId),
       this.deps.evaluations.listByRun(runId),
     ])
+    const run = await this.mustRun(runId)
     return { run, events, approvals, toolCalls, effects, artifacts, evaluations }
   }
 
-  async list(): Promise<RunRecord[]> {
-    return this.deps.runs.list()
+  /** Runs visible to a user, scoped to their workspaces (bounded queries). */
+  async list(user: { id: string }): Promise<RunRecord[]> {
+    const workspaceIds = await this.deps.access.workspaceIdsForUser(user.id)
+    const runs: RunRecord[] = []
+    for (const workspaceId of workspaceIds) {
+      runs.push(...(await this.deps.runs.listByWorkspace(workspaceId)))
+    }
+    return runs
   }
 
   /** Runs that are still executing (queued / running / awaiting_approval). */
-  async listActive(): Promise<RunRecord[]> {
-    const runs = await this.deps.runs.list()
+  async listActive(user: { id: string }): Promise<RunRecord[]> {
+    const runs = await this.list(user)
     return runs.filter(
       (run) =>
         run.status === 'queued' || run.status === 'running' || run.status === 'awaiting_approval',
@@ -180,18 +202,20 @@ export class RunEngine {
   }
 
   /** Recently finished runs (completed / failed / cancelled). */
-  async listRecent(): Promise<RunRecord[]> {
-    const runs = await this.deps.runs.list()
+  async listRecent(user: { id: string }): Promise<RunRecord[]> {
+    const runs = await this.list(user)
     return runs.filter(
       (run) => run.status === 'completed' || run.status === 'failed' || run.status === 'cancelled',
     )
   }
 
-  /** Pending approvals across all awaiting runs (for Mission Control). */
-  async listPendingApprovals(): Promise<
+  /** Pending approvals across the user's awaiting runs (for Mission Control). */
+  async listPendingApprovals(user: {
+    id: string
+  }): Promise<
     Array<{ run: RunRecord; approval: ApprovalRecord; toolCall: ToolCallRecord | null }>
   > {
-    const runs = await this.deps.runs.list()
+    const runs = await this.list(user)
     const result: Array<{
       run: RunRecord
       approval: ApprovalRecord
@@ -259,6 +283,7 @@ export class RunEngine {
     approvalId: string,
     decision: 'approve' | 'reject',
   ): Promise<ApprovalRecord> {
+    await this.deps.access.assertCanAccessRun(user.id, runId, 'approve')
     const approval = await this.deps.approvals.findById(approvalId)
     if (!approval || approval.runId !== runId) {
       throw new AppError('NOT_FOUND', 'approval not found')
@@ -280,7 +305,7 @@ export class RunEngine {
 
   /** Cancel a run from any non-terminal state. */
   async cancel(user: { id: string }, runId: string): Promise<RunRecord> {
-    const run = await this.mustRun(runId)
+    const run = await this.deps.access.assertCanAccessRun(user.id, runId, 'cancel')
     if (!canRunTransition(run.status, 'cancel')) {
       throw new AppError('CONFLICT', `run cannot be cancelled from status ${run.status}`)
     }
@@ -309,7 +334,7 @@ export class RunEngine {
     runId: string,
     input: { verdict: Evaluation['verdict']; score?: number; criteria?: Evaluation['criteria'] },
   ): Promise<Evaluation> {
-    const run = await this.mustRun(runId)
+    const run = await this.deps.access.assertCanAccessRun(user.id, runId, 'evaluate')
     if (run.status !== 'completed') {
       throw new AppError('CONFLICT', 'only completed runs can be evaluated')
     }

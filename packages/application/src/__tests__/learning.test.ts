@@ -98,6 +98,7 @@ function seedRun(
   })
   const run: RunRecord = {
     id: input.runId,
+    workspaceId: input.workspaceId,
     status: 'completed',
     snapshot: {
       problemSpec: { id: 'spec-' + input.runId, kind: 'problem_specification' },

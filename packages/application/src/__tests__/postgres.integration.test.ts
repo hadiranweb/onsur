@@ -7,6 +7,7 @@ import { createPostgresRepositories } from '../infrastructure/postgres-repositor
 import { InMemoryToolRegistry } from '../infrastructure/tool-registry'
 import { FakeRuntimeAdapter } from '../infrastructure/fake-runtime-adapter'
 import { RunEngine } from '../services/run-engine'
+import { ResourceAccessService } from '../services/resource-access-service'
 import { runMigrations } from '../infrastructure/migrate'
 import type { AppServices } from '../app'
 import type { RunView } from '../services/run-engine'
@@ -303,7 +304,7 @@ describe('postgres persistence (integration)', () => {
       problemSpecId: specId,
     })
 
-    const view = await waitForRunStatus(app.runs, run.id, ['completed'])
+    const view = await waitForRunStatus(app.runs, run.id, ['completed'], registered.user.id)
     expect(view.run.status).toBe('completed')
     expect(view.artifacts).toHaveLength(1)
     expect(view.toolCalls[0]!.toolName).toBe('Analyze')
@@ -346,6 +347,11 @@ describe('postgres persistence (integration)', () => {
       registry: new InMemoryToolRegistry(),
       islands: app.islands,
       processes: app.processes,
+      access: new ResourceAccessService({
+        specifications: repos.specifications,
+        runs: repos.runs,
+        workspaces: app.workspaces,
+      }),
       runtimeFactory: (_island, gate) =>
         new FakeRuntimeAdapter({
           script: [{ toolId: 'tool-send-email', arguments: { to: 'x@example.com' } }],
@@ -359,7 +365,7 @@ describe('postgres persistence (integration)', () => {
       problemSpecId: confirmed.confirmed!.id,
     })
 
-    const paused = await waitForRunStatus(engine, run.id, ['awaiting_approval'])
+    const paused = await waitForRunStatus(engine, run.id, ['awaiting_approval'], registered.user.id)
     expect(paused.approvals[0]!.status).toBe('pending')
 
     await engine.decideApproval(
@@ -369,7 +375,7 @@ describe('postgres persistence (integration)', () => {
       'reject',
     )
 
-    const view = await waitForRunStatus(engine, run.id, ['completed'])
+    const view = await waitForRunStatus(engine, run.id, ['completed'], registered.user.id)
     expect(view.run.status).toBe('completed')
     expect(view.toolCalls[0]!.status).toBe('rejected')
     expect(view.effects).toHaveLength(0)
@@ -423,7 +429,7 @@ describe('postgres persistence (integration)', () => {
       islandId: ref.island.id,
       problemSpecId: confirmed.confirmed!.id,
     })
-    await waitForRunStatus(app.runs, run.id, ['completed'])
+    await waitForRunStatus(app.runs, run.id, ['completed'], registered.user.id)
 
     const submitted = await app.feedback.submit({
       runId: run.id,
@@ -595,7 +601,12 @@ describe('postgres persistence (integration)', () => {
       problemSpecId: confirmed.confirmed!.id,
     })
 
-    const paused = await waitForRunStatus(app.runs, run.id, ['awaiting_approval'])
+    const paused = await waitForRunStatus(
+      app.runs,
+      run.id,
+      ['awaiting_approval'],
+      registered.user.id,
+    )
     expect(paused.approvals[0]!.effectKind).toBe('external_reversible')
 
     await app.runs.decideApproval(
@@ -605,7 +616,7 @@ describe('postgres persistence (integration)', () => {
       'approve',
     )
 
-    const view = await waitForRunStatus(app.runs, run.id, ['completed'])
+    const view = await waitForRunStatus(app.runs, run.id, ['completed'], registered.user.id)
     expect(view.run.status).toBe('completed')
     expect(view.toolCalls[0]!.status).toBe('executed')
     expect(view.effects).toHaveLength(1)
@@ -681,18 +692,159 @@ describe('postgres persistence (integration)', () => {
       code: 'INVALID_INPUT',
     })
   })
+
+  describe('run workspace authority (R0)', () => {
+    it('denies a foreign actor enqueuing a run from another workspace spec', async () => {
+      const alice = await app.auth.register({
+        email: uniqueEmail(),
+        password: 'password123',
+        displayName: 'Alice Auth',
+      })
+      const bob = await app.auth.register({
+        email: uniqueEmail(),
+        password: 'password123',
+        displayName: 'Bob Auth',
+      })
+      const alicePersonal = (await app.workspaces.getPersonalWorkspace(alice.user.id))!
+
+      const founder = await app.founder.start(
+        alice.user,
+        alicePersonal.id,
+        'Auth integration problem.',
+      )
+      const confirmed = await app.founder.confirm(alice.user, alicePersonal.id, founder.session.id)
+      const island = await app.islands.ensureReferenceIsland({ actorUserId: alice.user.id })
+
+      await expect(
+        app.runs.enqueue({
+          actorUserId: bob.user.id,
+          islandId: island.island.id,
+          problemSpecId: confirmed.confirmed!.id,
+        }),
+      ).rejects.toMatchObject({ code: 'FORBIDDEN' })
+    })
+
+    it('denies a foreign actor reading, cancelling, and evaluating a run', async () => {
+      const alice = await app.auth.register({
+        email: uniqueEmail(),
+        password: 'password123',
+        displayName: 'Alice Auth2',
+      })
+      const bob = await app.auth.register({
+        email: uniqueEmail(),
+        password: 'password123',
+        displayName: 'Bob Auth2',
+      })
+      const alicePersonal = (await app.workspaces.getPersonalWorkspace(alice.user.id))!
+
+      const founder = await app.founder.start(alice.user, alicePersonal.id, 'Auth read isolation.')
+      const confirmed = await app.founder.confirm(alice.user, alicePersonal.id, founder.session.id)
+      const island = await app.islands.ensureReferenceIsland({ actorUserId: alice.user.id })
+
+      const run = await app.runs.enqueue({
+        actorUserId: alice.user.id,
+        islandId: island.island.id,
+        problemSpecId: confirmed.confirmed!.id,
+      })
+      await waitForRunStatus(app.runs, run.id, ['completed'], alice.user.id)
+
+      await expect(app.runs.get({ id: bob.user.id }, run.id)).rejects.toMatchObject({
+        code: 'FORBIDDEN',
+      })
+      await expect(app.runs.cancel({ id: bob.user.id }, run.id)).rejects.toMatchObject({
+        code: 'FORBIDDEN',
+      })
+      await expect(
+        app.runs.evaluate({ id: bob.user.id }, run.id, { verdict: 'pass' }),
+      ).rejects.toMatchObject({ code: 'FORBIDDEN' })
+
+      // Owner still reads and evaluates.
+      const view = await app.runs.get({ id: alice.user.id }, run.id)
+      expect(view.run.status).toBe('completed')
+    })
+
+    it('denies a foreign approval decision but allows the owner', async () => {
+      const alice = await app.auth.register({
+        email: uniqueEmail(),
+        password: 'password123',
+        displayName: 'Alice Auth3',
+      })
+      const bob = await app.auth.register({
+        email: uniqueEmail(),
+        password: 'password123',
+        displayName: 'Bob Auth3',
+      })
+      const alicePersonal = (await app.workspaces.getPersonalWorkspace(alice.user.id))!
+
+      const founder = await app.founder.start(
+        alice.user,
+        alicePersonal.id,
+        'Auth approval isolation.',
+      )
+      const confirmed = await app.founder.confirm(alice.user, alicePersonal.id, founder.session.id)
+      const island = await app.islands.ensureControlledActionIsland({ actorUserId: alice.user.id })
+
+      const run = await app.runs.enqueue({
+        actorUserId: alice.user.id,
+        islandId: island.island.id,
+        problemSpecId: confirmed.confirmed!.id,
+      })
+      const paused = await waitForRunStatus(app.runs, run.id, ['awaiting_approval'], alice.user.id)
+      const approvalId = paused.approvals[0]!.id
+
+      await expect(
+        app.runs.decideApproval({ id: bob.user.id }, run.id, approvalId, 'approve'),
+      ).rejects.toMatchObject({ code: 'FORBIDDEN' })
+
+      await app.runs.decideApproval({ id: alice.user.id }, run.id, approvalId, 'approve')
+      const done = await waitForRunStatus(app.runs, run.id, ['completed'], alice.user.id)
+      expect(done.effects).toHaveLength(1)
+    })
+
+    it('scopes run lists to the user workspaces', async () => {
+      const alice = await app.auth.register({
+        email: uniqueEmail(),
+        password: 'password123',
+        displayName: 'Alice Auth4',
+      })
+      const bob = await app.auth.register({
+        email: uniqueEmail(),
+        password: 'password123',
+        displayName: 'Bob Auth4',
+      })
+      const alicePersonal = (await app.workspaces.getPersonalWorkspace(alice.user.id))!
+
+      const founder = await app.founder.start(alice.user, alicePersonal.id, 'Auth list isolation.')
+      const confirmed = await app.founder.confirm(alice.user, alicePersonal.id, founder.session.id)
+      const island = await app.islands.ensureReferenceIsland({ actorUserId: alice.user.id })
+
+      const run = await app.runs.enqueue({
+        actorUserId: alice.user.id,
+        islandId: island.island.id,
+        problemSpecId: confirmed.confirmed!.id,
+      })
+      await waitForRunStatus(app.runs, run.id, ['completed'], alice.user.id)
+
+      const aliceList = await app.runs.list({ id: alice.user.id })
+      expect(aliceList.map((entry) => entry.id)).toContain(run.id)
+
+      const bobList = await app.runs.list({ id: bob.user.id })
+      expect(bobList.map((entry) => entry.id)).not.toContain(run.id)
+    })
+  })
 })
 
 async function waitForRunStatus(
   engine: RunEngine,
   runId: string,
   statuses: string[],
+  userId: string,
   timeoutMs = 5000,
 ): Promise<RunView> {
   const start = Date.now()
   let view: RunView
   do {
-    view = await engine.get(runId)
+    view = await engine.get({ id: userId }, runId)
     if (statuses.includes(view.run.status)) return view
     await new Promise((resolve) => setTimeout(resolve, 10))
   } while (Date.now() - start < timeoutMs)

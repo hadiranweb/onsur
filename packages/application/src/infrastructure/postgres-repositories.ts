@@ -808,6 +808,7 @@ export class PostgresIslandRepository implements IslandRepository {
 function mapRun(row: Record<string, unknown>): RunRecord {
   return {
     id: row.id as string,
+    workspaceId: (row.workspace_id as string | null) ?? null,
     status: row.status as RunStatus,
     snapshot: row.snapshot as RunSnapshot,
     provenance: row.provenance as Provenance,
@@ -991,31 +992,36 @@ function mapAssetInstall(row: Record<string, unknown>): AssetInstallRecord {
   }
 }
 
+const RUN_COLUMNS = 'id, workspace_id, status, snapshot, provenance, created_at, updated_at'
+
 export class PostgresRunRepository implements RunRepository {
   constructor(private readonly pool: Pool) {}
 
   async create(input: RunRecord): Promise<RunRecord> {
     const result = await this.pool.query(
-      `INSERT INTO runs (id, status, snapshot, provenance)
-       VALUES ($1, $2, $3, $4)
-       RETURNING id, status, snapshot, provenance, created_at, updated_at`,
-      [input.id, input.status, JSON.stringify(input.snapshot), JSON.stringify(input.provenance)],
+      `INSERT INTO runs (id, workspace_id, status, snapshot, provenance)
+       VALUES ($1, $2, $3, $4, $5)
+       RETURNING ${RUN_COLUMNS}`,
+      [
+        input.id,
+        input.workspaceId,
+        input.status,
+        JSON.stringify(input.snapshot),
+        JSON.stringify(input.provenance),
+      ],
     )
     return mapRun(result.rows[0])
   }
 
   async findById(id: string): Promise<RunRecord | null> {
-    const result = await this.pool.query(
-      `SELECT id, status, snapshot, provenance, created_at, updated_at FROM runs WHERE id = $1`,
-      [id],
-    )
+    const result = await this.pool.query(`SELECT ${RUN_COLUMNS} FROM runs WHERE id = $1`, [id])
     return result.rows[0] ? mapRun(result.rows[0]) : null
   }
 
   async updateStatus(id: string, status: RunStatus): Promise<RunRecord> {
     const result = await this.pool.query(
       `UPDATE runs SET status = $2, updated_at = now() WHERE id = $1
-       RETURNING id, status, snapshot, provenance, created_at, updated_at`,
+       RETURNING ${RUN_COLUMNS}`,
       [id, status],
     )
     return mapRun(result.rows[0])
@@ -1046,8 +1052,14 @@ export class PostgresRunRepository implements RunRepository {
   }
 
   async list(): Promise<RunRecord[]> {
+    const result = await this.pool.query(`SELECT ${RUN_COLUMNS} FROM runs ORDER BY created_at DESC`)
+    return result.rows.map(mapRun)
+  }
+
+  async listByWorkspace(workspaceId: string): Promise<RunRecord[]> {
     const result = await this.pool.query(
-      `SELECT id, status, snapshot, provenance, created_at, updated_at FROM runs ORDER BY created_at DESC`,
+      `SELECT ${RUN_COLUMNS} FROM runs WHERE workspace_id = $1 ORDER BY created_at DESC`,
+      [workspaceId],
     )
     return result.rows.map(mapRun)
   }

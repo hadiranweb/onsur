@@ -5,8 +5,11 @@ import { getApp } from '@/lib/server/services'
 export const dynamic = 'force-dynamic'
 
 export default async function RunsHome({ searchParams }: { searchParams: { error?: string } }) {
-  await requireUser()
-  const [runs, islands] = await Promise.all([getApp().runs.list(), getApp().islands.listActive()])
+  const user = await requireUser()
+  const [runs, islands] = await Promise.all([
+    getApp().runs.list(user),
+    getApp().islands.listActive(),
+  ])
 
   return (
     <main>

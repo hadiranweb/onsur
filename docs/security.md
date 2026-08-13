@@ -37,14 +37,27 @@ statement, only per-item with the mechanism and where it is tested.
 
 ## Data & invariants
 
-- Raw user data is workspace-scoped; workspace isolation is enforced at every
-  service boundary (`assertAccess`).
+- Raw user data is workspace-scoped.
+- Execution resources are authorized through explicit workspace/resource
+  authority (`ResourceAccessService`): a Run carries an explicit execution
+  workspace; Run create/read/cancel/approve/evaluate and its derived data
+  (events, tool calls, effects, artifacts, evaluations) resolve authority
+  through the owning Run. Ungranted raw cross-workspace access fails closed
+  (verified by `authority.test.ts`, integration tests, and
+  `pnpm e2e:authority`).
+- Future legitimate cross-workspace relationships (installed / shared /
+  delegated / public / contractual) must pass the authority resolver extension
+  seam — they are not implemented in v1.
 - Published/versioned objects are immutable by construction (new version =
   new row; prior version superseded, never mutated).
 - Model output is untrusted until schema-validated; malformed output is
   rejected before persistence.
 - Connector status distinguishes connected / not_configured / degraded / error
   from a live probe — never inferred from a secret's presence.
+
+> Remediation note (R0): prior text claimed workspace isolation "at every
+> service boundary"; that was contradicted by the v1 audit for the Run engine.
+> R0 closed that gap for execution resources as described above.
 
 ## Residual risks (documented)
 

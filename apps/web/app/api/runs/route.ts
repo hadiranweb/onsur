@@ -10,7 +10,7 @@ export async function GET() {
   if (!user) {
     return NextResponse.json({ error: 'unauthenticated' }, { status: 401 })
   }
-  const runs = await getApp().runs.list()
+  const runs = await getApp().runs.list(user)
   return NextResponse.json({ runs })
 }
 

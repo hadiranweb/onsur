@@ -279,6 +279,8 @@ export interface IslandRepository {
 
 export interface RunRecord {
   id: string
+  /** The explicit execution workspace this run is authorized within. */
+  workspaceId: string | null
   status: RunStatus
   snapshot: RunSnapshot
   provenance: Provenance
@@ -352,6 +354,8 @@ export interface RunRepository {
   }): Promise<RunEventRecord>
   listEvents(runId: string): Promise<RunEventRecord[]>
   list(): Promise<RunRecord[]>
+  /** Runs already bounded to an authorized workspace (indexed lookup). */
+  listByWorkspace(workspaceId: string): Promise<RunRecord[]>
 }
 
 export interface ApprovalRepository {

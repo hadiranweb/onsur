@@ -16,6 +16,7 @@ import { KnowledgeService } from './services/knowledge-service'
 import { MemoryService } from './services/memory-service'
 import { ProcessService } from './services/process-service'
 import { RunEngine } from './services/run-engine'
+import { ResourceAccessService } from './services/resource-access-service'
 import { VersionProposalService } from './services/version-proposal-service'
 import { WorkspaceService } from './services/workspace-service'
 import { PackageService } from './services/package-service'
@@ -133,6 +134,12 @@ export function createAppServices(config: AppServicesConfig): AppServices {
     workspaces,
   })
 
+  const access = new ResourceAccessService({
+    specifications: repositories.specifications,
+    runs: repositories.runs,
+    workspaces,
+  })
+
   const runs = new RunEngine({
     runs: repositories.runs,
     approvals: repositories.approvals,
@@ -144,6 +151,7 @@ export function createAppServices(config: AppServicesConfig): AppServices {
     registry: new InMemoryToolRegistry(),
     islands,
     processes,
+    access,
     openClawConfig: config.openClaw,
     memoryIntake: memory,
   })

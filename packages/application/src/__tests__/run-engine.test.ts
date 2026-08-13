@@ -2,9 +2,11 @@ import { describe, expect, it } from 'vitest'
 import type { Island } from '@element-plus/contracts'
 import type { ProblemSpecificationRecord } from '../ports'
 import { RunEngine, normalizeError } from '../services/run-engine'
+import { ResourceAccessService } from '../services/resource-access-service'
 import { IslandService } from '../services/island-service'
 import { ProcessService } from '../services/process-service'
 import { CapabilityService } from '../services/capability-service'
+import { WorkspaceService } from '../services/workspace-service'
 import { FakeRuntimeAdapter } from '../infrastructure/fake-runtime-adapter'
 import type { FakeRuntimeScriptStep } from '../infrastructure/fake-runtime-adapter'
 import { InMemoryToolRegistry } from '../infrastructure/tool-registry'
@@ -16,10 +18,12 @@ import {
   InMemoryEffectRepository,
   InMemoryEvaluationRepository,
   InMemoryIslandRepository,
+  InMemoryMembershipRepository,
   InMemoryProblemSpecificationRepository,
   InMemoryProcessRepository,
   InMemoryRunRepository,
   InMemoryToolCallRepository,
+  InMemoryWorkspaceRepository,
 } from './fakes'
 
 const NOW = '2026-08-13T00:00:00.000Z'
@@ -88,10 +92,25 @@ function build(runtimeFactory?: (island: Island, gate: ToolGate) => RuntimeAdapt
   const islandRepo = new InMemoryIslandRepository()
   const processRepo = new InMemoryProcessRepository()
   const capabilityRepo = new InMemoryCapabilityRepository()
+  const workspacesRepo = new InMemoryWorkspaceRepository()
+  const memberships = new InMemoryMembershipRepository()
+
+  // Seed the fixture workspace 'ws-1' owned by the test actor 'user-1' so the
+  // run engine's authority checks resolve 'owned' for the fixture spec.
+  void workspacesRepo.create({
+    id: 'ws-1',
+    slug: 'ws-1',
+    name: 'Fixture workspace',
+    kind: 'team',
+    ownerUserId: 'user-1',
+  })
+  void memberships.create({ workspaceId: 'ws-1', userId: 'user-1', role: 'owner' })
 
   const capabilities = new CapabilityService({ capabilities: capabilityRepo })
   const islands = new IslandService({ islands: islandRepo, capabilities })
   const processes = new ProcessService({ processes: processRepo })
+  const workspaces = new WorkspaceService({ workspaces: workspacesRepo, memberships })
+  const access = new ResourceAccessService({ specifications: specs, runs, workspaces })
 
   const engine = new RunEngine({
     runs,
@@ -104,6 +123,7 @@ function build(runtimeFactory?: (island: Island, gate: ToolGate) => RuntimeAdapt
     registry: new InMemoryToolRegistry(),
     islands,
     processes,
+    access,
     runtimeFactory,
   })
 
@@ -119,7 +139,7 @@ async function waitForStatus(
   const start = Date.now()
   let view
   do {
-    view = await engine.get(runId)
+    view = await engine.get({ id: 'user-1' }, runId)
     if (statuses.includes(view.run.status)) return view
     await new Promise((resolve) => setTimeout(resolve, 10))
   } while (Date.now() - start < timeoutMs)

@@ -585,6 +585,10 @@ export class InMemoryRunRepository implements RunRepository {
   async list(): Promise<RunRecord[]> {
     return [...this.byId.values()]
   }
+
+  async listByWorkspace(workspaceId: string): Promise<RunRecord[]> {
+    return [...this.byId.values()].filter((run) => run.workspaceId === workspaceId)
+  }
 }
 
 export class InMemoryApprovalRepository implements ApprovalRepository {

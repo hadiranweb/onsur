@@ -13,13 +13,13 @@ export default async function RunDetail({
   params: { id: string }
   searchParams: { error?: string }
 }) {
-  await requireUser()
+  const user = await requireUser()
 
   let view
   try {
-    view = await getApp().runs.get(params.id)
+    view = await getApp().runs.get(user, params.id)
   } catch (error) {
-    if (error instanceof AppError && error.code === 'NOT_FOUND') {
+    if (error instanceof AppError && (error.code === 'NOT_FOUND' || error.code === 'FORBIDDEN')) {
       notFound()
     }
     throw error

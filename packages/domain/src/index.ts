@@ -102,6 +102,9 @@ export { requiresApproval, isToolExecutionAuthorized } from './rules/authority'
 
 export { canWriteMemory, canReadMemory } from './rules/memory'
 
+export { isAccessAllowed, LOCAL_RELATIONSHIPS } from './rules/resource-access'
+export type { ResourceRelationship, ResourceAction } from './rules/resource-access'
+
 export { validatePackageCorrelation, correlationSurvives, deliveryKey } from './rules/package'
 
 export { canPublishAsset, forkProvenanceDerivesFrom, installsExactVersion } from './rules/asset'

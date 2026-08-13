@@ -17,7 +17,8 @@
     "check:arch": "node scripts/check-architecture.mjs",
     "db:start": "pnpm --filter @element-plus/application db:start",
     "db:migrate": "pnpm --filter @element-plus/application db:migrate",
-    "e2e:vertical": "pnpm --filter @element-plus/application e2e:vertical"
+    "e2e:vertical": "pnpm --filter @element-plus/application e2e:vertical",
+    "e2e:authority": "pnpm --filter @element-plus/application e2e:authority"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.0",

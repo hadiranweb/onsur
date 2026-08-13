@@ -17,7 +17,8 @@
     "test": "vitest run",
     "db:start": "node scripts/start-db.mjs",
     "db:migrate": "node scripts/migrate.mjs",
-    "e2e:vertical": "node scripts/e2e-vertical.mjs"
+    "e2e:vertical": "node scripts/e2e-vertical.mjs",
+    "e2e:authority": "node scripts/e2e-authority.mjs"
   },
   "dependencies": {
     "@element-plus/contracts": "workspace:*",

@@ -108,6 +108,9 @@ export type {
   RunMemoryIntake,
 } from './services/run-engine'
 
+export { ResourceAccessService } from './services/resource-access-service'
+export type { ResourceAccessDeps } from './services/resource-access-service'
+
 export { EvidenceService } from './services/evidence-service'
 export type { EvidenceServiceDeps, IntakeEvidenceInput } from './services/evidence-service'
 

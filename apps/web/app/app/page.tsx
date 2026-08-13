@@ -11,9 +11,9 @@ export default async function MissionControl() {
 
   const [accesses, pending, active, recent, islands, connectors] = await Promise.all([
     app.workspaces.listForUser(user.id),
-    app.runs.listPendingApprovals(),
-    app.runs.listActive(),
-    app.runs.listRecent(),
+    app.runs.listPendingApprovals(user),
+    app.runs.listActive(user),
+    app.runs.listRecent(user),
     app.islands.listActive(),
     app.packages.listConnectors(),
   ])
