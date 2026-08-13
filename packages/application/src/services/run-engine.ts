@@ -170,6 +170,48 @@ export class RunEngine {
     return this.deps.runs.list()
   }
 
+  /** Runs that are still executing (queued / running / awaiting_approval). */
+  async listActive(): Promise<RunRecord[]> {
+    const runs = await this.deps.runs.list()
+    return runs.filter(
+      (run) =>
+        run.status === 'queued' || run.status === 'running' || run.status === 'awaiting_approval',
+    )
+  }
+
+  /** Recently finished runs (completed / failed / cancelled). */
+  async listRecent(): Promise<RunRecord[]> {
+    const runs = await this.deps.runs.list()
+    return runs.filter(
+      (run) => run.status === 'completed' || run.status === 'failed' || run.status === 'cancelled',
+    )
+  }
+
+  /** Pending approvals across all awaiting runs (for Mission Control). */
+  async listPendingApprovals(): Promise<
+    Array<{ run: RunRecord; approval: ApprovalRecord; toolCall: ToolCallRecord | null }>
+  > {
+    const runs = await this.deps.runs.list()
+    const result: Array<{
+      run: RunRecord
+      approval: ApprovalRecord
+      toolCall: ToolCallRecord | null
+    }> = []
+    for (const run of runs) {
+      if (run.status !== 'awaiting_approval') {
+        continue
+      }
+      const approvals = (await this.deps.approvals.listByRun(run.id)).filter(
+        (approval) => approval.status === 'pending',
+      )
+      for (const approval of approvals) {
+        const toolCall = await this.deps.toolCalls.findById(approval.toolCallId)
+        result.push({ run, approval, toolCall })
+      }
+    }
+    return result
+  }
+
   /** Approve or reject a pending approval (default deny: only `approve` grants). */
   async decideApproval(
     user: { id: string },
@@ -528,7 +570,7 @@ function defaultRuntimeFactory(
   openClawConfig?: OpenClawCliConfig,
 ): RuntimeAdapter {
   if (island.runtime.runtime === 'fake') {
-    return new FakeRuntimeAdapter({ gate })
+    return new FakeRuntimeAdapter({ gate, script: parseFakeScript(island.runtime.config) })
   }
   if (island.runtime.runtime === 'openclaw') {
     const config = openClawConfig ?? {
@@ -559,3 +601,30 @@ export function extractMemoryCandidates(result: unknown): string[] {
 // Re-export for backwards compatibility; the canonical implementation lives in
 // `util/normalize-error` (shared with the OpenClaw adapter).
 export { normalizeError }
+
+/**
+ * Parse the fake-runtime script from an island's runtime binding config.
+ * Islands may declare a deterministic tool script; unknown/malformed config
+ * falls back to no script (the adapter's default read-only analysis script).
+ */
+export function parseFakeScript(
+  config: Record<string, unknown>,
+): { toolId: string; arguments: Record<string, unknown> }[] | undefined {
+  const script = config?.script
+  if (!Array.isArray(script)) {
+    return undefined
+  }
+  const steps = []
+  for (const step of script) {
+    if (typeof step !== 'object' || step === null) {
+      continue
+    }
+    const toolId = (step as { toolId?: unknown }).toolId
+    const args = (step as { arguments?: unknown }).arguments
+    if (typeof toolId !== 'string' || typeof args !== 'object' || args === null) {
+      continue
+    }
+    steps.push({ toolId, arguments: args as Record<string, unknown> })
+  }
+  return steps.length > 0 ? steps : undefined
+}

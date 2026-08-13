@@ -3,6 +3,7 @@ import { CapabilityService } from '../services/capability-service'
 import { IslandService } from '../services/island-service'
 import { ProcessService } from '../services/process-service'
 import { structuredAnalysisIslandManifest } from '../reference-islands/structured-analysis'
+import { controlledActionIslandManifest } from '../reference-islands/controlled-action'
 import type { IslandManifest, ProcessStep } from '@element-plus/contracts'
 import {
   InMemoryCapabilityRepository,
@@ -261,5 +262,28 @@ describe('reference structured analysis island', () => {
 
     const capability = await capabilities.findByName('Structured Analysis')
     expect(capability).not.toBeNull()
+  })
+})
+
+describe('reference controlled action island', () => {
+  it('ensureControlledActionIsland creates, activates, and then reuses', async () => {
+    const { islands, capabilities } = build()
+
+    const first = await islands.ensureControlledActionIsland({ actorUserId: ACTOR })
+    expect(first.reused).toBe(false)
+    expect(first.island.status).toBe('active')
+    expect(first.island.name).toBe('Controlled Action Island')
+
+    const second = await islands.ensureControlledActionIsland({ actorUserId: ACTOR })
+    expect(second.reused).toBe(true)
+    expect(second.island.id).toBe(first.island.id)
+
+    const capability = await capabilities.findByName('Controlled Action')
+    expect(capability).not.toBeNull()
+  })
+
+  it('the manifest declares an external_reversible script step', () => {
+    expect(controlledActionIslandManifest.runtime.runtime).toBe('fake')
+    expect(controlledActionIslandManifest.capabilities[0]!.id).toBe('cap-controlled-action')
   })
 })

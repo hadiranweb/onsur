@@ -570,6 +570,49 @@ describe('postgres persistence (integration)', () => {
     expect(await connector!.check()).toEqual({ status: 'connected' })
     expect(app.packages.getConnector('missing')).toBeUndefined()
   })
+
+  it('runs the Controlled Action Island end-to-end: approval → external_reversible effect recorded', async () => {
+    const registered = await app.auth.register({
+      email: uniqueEmail(),
+      password: 'password123',
+      displayName: 'Controlled Actor',
+    })
+    const personal = (await app.workspaces.getPersonalWorkspace(registered.user.id))!
+
+    const ref = await app.islands.ensureControlledActionIsland({ actorUserId: registered.user.id })
+    expect(ref.island.status).toBe('active')
+
+    const started = await app.founder.start(
+      registered.user,
+      personal.id,
+      'Controlled action integration problem.',
+    )
+    const confirmed = await app.founder.confirm(registered.user, personal.id, started.session.id)
+
+    const run = await app.runs.enqueue({
+      actorUserId: registered.user.id,
+      islandId: ref.island.id,
+      problemSpecId: confirmed.confirmed!.id,
+    })
+
+    const paused = await waitForRunStatus(app.runs, run.id, ['awaiting_approval'])
+    expect(paused.approvals[0]!.effectKind).toBe('external_reversible')
+
+    await app.runs.decideApproval(
+      { id: registered.user.id },
+      run.id,
+      paused.approvals[0]!.id,
+      'approve',
+    )
+
+    const view = await waitForRunStatus(app.runs, run.id, ['completed'])
+    expect(view.run.status).toBe('completed')
+    expect(view.toolCalls[0]!.status).toBe('executed')
+    expect(view.effects).toHaveLength(1)
+    expect(view.effects[0]!.kind).toBe('external_reversible')
+    expect(view.approvals[0]!.status).toBe('approved')
+    expect(view.events.map((event) => event.type)).toContain('approve')
+  })
 })
 
 async function waitForRunStatus(

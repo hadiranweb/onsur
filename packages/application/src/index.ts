@@ -91,7 +91,12 @@ export type {
   ResolveOrCreateResult,
 } from './services/island-service'
 
-export { RunEngine, normalizeError, extractMemoryCandidates } from './services/run-engine'
+export {
+  RunEngine,
+  normalizeError,
+  extractMemoryCandidates,
+  parseFakeScript,
+} from './services/run-engine'
 export type {
   EnqueueRunInput,
   RunEngineDeps,
@@ -153,6 +158,11 @@ export {
   STRUCTURED_ANALYSIS_CAPABILITY,
   structuredAnalysisIslandManifest,
 } from './reference-islands/structured-analysis'
+
+export {
+  CONTROLLED_ACTION_CAPABILITY,
+  controlledActionIslandManifest,
+} from './reference-islands/controlled-action'
 
 export { makeProvenance } from './util/provenance'
 

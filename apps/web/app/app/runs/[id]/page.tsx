@@ -48,25 +48,34 @@ export default async function RunDetail({
       {pending.length > 0 && (
         <section className="run__approvals">
           <h2>Pending approvals</h2>
-          {pending.map((approval) => (
-            <div key={approval.id} className="run__approval">
-              <p>
-                <em>{approval.effectKind}</em> effect requires approval.
-              </p>
-              <form
-                action={`/api/runs/${run.id}/approvals/${approval.id}`}
-                method="post"
-                className="founder__actions"
-              >
-                <button type="submit" name="decision" value="approve">
-                  Approve
-                </button>
-                <button type="submit" name="decision" value="reject">
-                  Reject
-                </button>
-              </form>
-            </div>
-          ))}
+          {pending.map((approval) => {
+            const toolCall = toolCalls.find((toolCall) => toolCall.id === approval.toolCallId)
+            return (
+              <div key={approval.id} className="run__approval">
+                <p>
+                  <strong>What will happen:</strong> {toolCall?.toolName ?? 'unknown tool'} will run
+                  with a <em>{approval.effectKind}</em> effect.
+                </p>
+                {toolCall && Object.keys(toolCall.arguments).length > 0 && (
+                  <pre className="run__arguments">
+                    {JSON.stringify(toolCall.arguments, null, 2)}
+                  </pre>
+                )}
+                <form
+                  action={`/api/runs/${run.id}/approvals/${approval.id}`}
+                  method="post"
+                  className="founder__actions"
+                >
+                  <button type="submit" name="decision" value="approve">
+                    Approve
+                  </button>
+                  <button type="submit" name="decision" value="reject">
+                    Reject
+                  </button>
+                </form>
+              </div>
+            )
+          })}
         </section>
       )}
 
@@ -77,7 +86,7 @@ export default async function RunDetail({
       )}
 
       <section className="run__timeline">
-        <h2>Timeline</h2>
+        <h2>Agent activity (timeline)</h2>
         <ol>
           {events.map((event) => (
             <li key={event.id}>

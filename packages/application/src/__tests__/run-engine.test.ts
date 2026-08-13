@@ -360,6 +360,106 @@ describe('run engine', () => {
   })
 })
 
+describe('controlled action island (config-driven script)', () => {
+  it('executes an external_reversible effect through the default factory with approval', async () => {
+    // No runtimeFactory override: the default factory reads config.script.
+    const h = build()
+    await h.islands.createDraft({
+      manifest: {
+        name: 'Controlled Action Island',
+        description: 'external reversible effect',
+        capabilities: [{ id: 'cap-controlled-action', kind: 'capability' }],
+        runtime: {
+          runtime: 'fake',
+          config: {
+            script: [
+              { toolId: 'tool-write-file', arguments: { path: '/tmp/x.txt', content: 'x' } },
+            ],
+          },
+        },
+        permissions: [],
+      },
+      actorUserId: 'user-1',
+      id: 'isl-1',
+    })
+    await h.islands.activate('isl-1')
+    await h.specs.create(confirmedSpec())
+
+    const run = await h.engine.enqueue({
+      actorUserId: 'user-1',
+      islandId: 'isl-1',
+      problemSpecId: 'ps-1',
+    })
+
+    const paused = await waitForStatus(h.engine, run.id, ['awaiting_approval'])
+    expect(paused.approvals[0]!.effectKind).toBe('external_reversible')
+    expect(paused.toolCalls[0]!.toolName).toBe('Write File')
+
+    await h.engine.decideApproval({ id: 'user-1' }, run.id, paused.approvals[0]!.id, 'approve')
+
+    const view = await waitForStatus(h.engine, run.id, ['completed'])
+    expect(view.toolCalls[0]!.status).toBe('executed')
+    expect(view.effects).toHaveLength(1)
+    expect(view.effects[0]!.kind).toBe('external_reversible')
+    expect(view.effects[0]!.description).toBe('Write File executed')
+  })
+
+  it('rejecting the external_reversible effect means the tool never executes', async () => {
+    const h = build()
+    await h.islands.createDraft({
+      manifest: {
+        name: 'Controlled Action Island',
+        description: 'external reversible effect',
+        capabilities: [{ id: 'cap-controlled-action', kind: 'capability' }],
+        runtime: {
+          runtime: 'fake',
+          config: {
+            script: [
+              { toolId: 'tool-write-file', arguments: { path: '/tmp/x.txt', content: 'x' } },
+            ],
+          },
+        },
+        permissions: [],
+      },
+      actorUserId: 'user-1',
+      id: 'isl-1',
+    })
+    await h.islands.activate('isl-1')
+    await h.specs.create(confirmedSpec())
+
+    const run = await h.engine.enqueue({
+      actorUserId: 'user-1',
+      islandId: 'isl-1',
+      problemSpecId: 'ps-1',
+    })
+
+    const paused = await waitForStatus(h.engine, run.id, ['awaiting_approval'])
+    await h.engine.decideApproval({ id: 'user-1' }, run.id, paused.approvals[0]!.id, 'reject')
+
+    const view = await waitForStatus(h.engine, run.id, ['completed'])
+    expect(view.toolCalls[0]!.status).toBe('rejected')
+    expect(view.effects).toHaveLength(0)
+    expect(view.events.map((event) => event.type)).toContain('reject')
+  })
+})
+
+describe('parseFakeScript', () => {
+  it('parses a well-formed script and ignores malformed entries', async () => {
+    const { parseFakeScript } = await import('../services/run-engine')
+    expect(
+      parseFakeScript({
+        script: [
+          { toolId: 'tool-a', arguments: { x: 1 } },
+          { toolId: 'tool-b', arguments: {} },
+        ],
+      }),
+    ).toHaveLength(2)
+    expect(parseFakeScript({ script: [{ notAToolId: true }] })).toBeUndefined()
+    expect(parseFakeScript({})).toBeUndefined()
+    expect(parseFakeScript({ script: 'nope' })).toBeUndefined()
+  })
+})
+
 describe('error normalization', () => {
   it('passes through a RuntimeError shape', () => {
     expect(normalizeError({ code: 'RUNTIME_ERROR', message: 'boom' })).toEqual({

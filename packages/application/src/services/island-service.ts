@@ -16,6 +16,10 @@ import {
   STRUCTURED_ANALYSIS_CAPABILITY,
   structuredAnalysisIslandManifest,
 } from '../reference-islands/structured-analysis'
+import {
+  CONTROLLED_ACTION_CAPABILITY,
+  controlledActionIslandManifest,
+} from '../reference-islands/controlled-action'
 
 export interface CreateIslandInput {
   manifest: IslandManifest
@@ -187,6 +191,38 @@ export class IslandService {
 
     const draft = await this.createDraft({
       manifest: structuredAnalysisIslandManifest,
+      actorUserId: input.actorUserId,
+      derivedFrom: input.derivedFrom,
+    })
+    await this.propose(draft.id)
+    const active = await this.activate(draft.id)
+    return { island: active, reused: false }
+  }
+
+  /**
+   * Ensure the reference Controlled Action Island exists and is active.
+   * Reuses an existing compatible active island.
+   */
+  async ensureControlledActionIsland(input: {
+    actorUserId: string
+    derivedFrom?: Reference[]
+  }): Promise<ResolveOrCreateResult> {
+    await this.deps.capabilities.ensureByName({
+      id: CONTROLLED_ACTION_CAPABILITY.id,
+      name: CONTROLLED_ACTION_CAPABILITY.name,
+      description: CONTROLLED_ACTION_CAPABILITY.description,
+      tags: CONTROLLED_ACTION_CAPABILITY.tags,
+      actorUserId: input.actorUserId,
+    })
+
+    const required = controlledActionIslandManifest.capabilities.map((capability) => capability.id)
+    const existing = await this.resolve(required)
+    if (existing) {
+      return { island: existing.island, reused: true }
+    }
+
+    const draft = await this.createDraft({
+      manifest: controlledActionIslandManifest,
       actorUserId: input.actorUserId,
       derivedFrom: input.derivedFrom,
     })
