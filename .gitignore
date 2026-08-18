@@ -27,8 +27,3 @@ coverage/
 # misc
 .DS_Store
 *.log
-
-# GitHub Actions workflows — temporarily excluded from git (Sprint 00 push).
-# The Arena GitHub App lacks the `workflows` permission to write these files;
-# kept locally and restored once the permission is granted.
-.github/workflows/
