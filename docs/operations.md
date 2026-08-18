@@ -6,7 +6,7 @@
 pnpm install
 pnpm db:start      # local PostgreSQL (PGlite over the wire protocol)
 pnpm db:migrate    # apply versioned migrations (DATABASE_URL required)
-pnpm dev           # Next.js dev server
+pnpm --filter @element-plus/web dev  # Next.js dev server
 ```
 
 Set `DATABASE_URL` and `AUTH_SECRET` (see `.env.example`).
