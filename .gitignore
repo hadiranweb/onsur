@@ -1,0 +1,29 @@
+# dependencies
+node_modules/
+
+# next.js
+.next/
+out/
+.vercel
+
+# build output
+dist/
+build/
+
+# test output
+coverage/
+
+# local database data (PGlite file-backed dev database)
+.data/
+
+# environment (never commit real secrets)
+.env
+.env.local
+.env.*.local
+
+# typescript
+*.tsbuildinfo
+
+# misc
+.DS_Store
+*.log

@@ -1,0 +1,36 @@
+{
+  "name": "@element-plus/application",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Application services / orchestration for Element Plus. Depends on domain and contracts.",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "types": "./src/index.ts",
+  "files": [
+    "src"
+  ],
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "build": "tsc --noEmit",
+    "test": "vitest run",
+    "db:start": "node scripts/start-db.mjs",
+    "db:migrate": "node scripts/migrate.mjs",
+    "e2e:vertical": "node scripts/e2e-vertical.mjs",
+    "e2e:authority": "node scripts/e2e-authority.mjs"
+  },
+  "dependencies": {
+    "@element-plus/contracts": "workspace:*",
+    "@element-plus/domain": "workspace:*",
+    "pg": "^8.13.0"
+  },
+  "devDependencies": {
+    "@electric-sql/pglite": "^0.5.4",
+    "@electric-sql/pglite-socket": "^0.2.7",
+    "@types/node": "^22.20.0",
+    "@types/pg": "^8.11.10",
+    "typescript": "^5.9.3",
+    "vitest": "^3.2.0"
+  }
+}

@@ -1,0 +1,13 @@
+node_modules
+.next
+out
+dist
+build
+coverage
+pnpm-lock.yaml
+.git
+*.tsbuildinfo
+
+# Immutable forensic evidence (see §25 of the remediation brief): never
+# reformatted after being committed.
+docs/audits/
